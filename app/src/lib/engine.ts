@@ -52,6 +52,21 @@ export interface SystemHealth {
   disk_free_bytes: number | null;
 }
 
+export type OfficeSuiteId = "msword" | "msexcel" | "mspowerpoint" | "libreoffice";
+export interface OfficeSuiteStatus {
+  available: boolean;
+  path?: string | null;
+  source?: "configured" | "auto" | null;
+  configuredInvalid?: boolean;
+}
+export type OfficeSuites = Record<OfficeSuiteId, OfficeSuiteStatus>;
+
+/** Per-suite availability; `binaryPath` is the LibreOffice path saved in Settings. */
+export async function detectOfficeSuites(binaryPath: string) {
+  const result = await engineRpc<{ suites: OfficeSuites }>("detect_office_suites", { binaryPath });
+  return result.suites;
+}
+
 export async function checkSystemHealth() {
   if (!tauriAvailable()) return { sidecar_online: false, libreoffice_path: null, disk_free_bytes: null } satisfies SystemHealth;
   return invoke<SystemHealth>("check_system_health");

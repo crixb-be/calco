@@ -68,7 +68,7 @@ export const domains: { id: Domain; label: string; description: string }[] = [
   {
     id: "conversor",
     label: "Conversor Universal",
-    description: "Puentes con LibreOffice para formatos de oficina",
+    description: "Puentes con Microsoft Office o LibreOffice para formatos de oficina",
   },
   {
     id: "docling",
@@ -447,11 +447,11 @@ export const tools: ToolDefinition[] = [
     engine: "office_bridge",
     action: "office_to_pdf",
     label: "Office a PDF",
-    description: "Convierte documentos, hojas y presentaciones con LibreOffice.",
+    description: "Convierte documentos, hojas y presentaciones con Microsoft Office (si está instalado) o LibreOffice.",
     icon: FileText,
     extensions: ["docx", "xlsx", "pptx", "odt", "ods", "odp"],
     multiFile: true,
-    fields: [t("binaryPath", "Ruta de LibreOffice")],
+    fields: [t("binaryPath", "Ruta de LibreOffice (opcional)")],
   },
   {
     id: "pdf_to_docx",
@@ -463,7 +463,7 @@ export const tools: ToolDefinition[] = [
     icon: FilePenLine,
     extensions: pdf,
     multiFile: false,
-    fields: [t("binaryPath", "Ruta de LibreOffice")],
+    fields: [t("binaryPath", "Ruta de LibreOffice (opcional)")],
   },
   {
     id: "pdf_to_xlsx",
@@ -475,7 +475,8 @@ export const tools: ToolDefinition[] = [
     icon: FileSpreadsheet,
     extensions: pdf,
     multiFile: false,
-    fields: [t("binaryPath", "Ruta de LibreOffice")],
+    // PyMuPDF + openpyxl only: no office suite involved.
+    fields: [],
   },
   {
     id: "to_audio",

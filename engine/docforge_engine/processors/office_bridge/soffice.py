@@ -8,7 +8,7 @@ from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.binaries import locate_binary
 from ...util.office_com import com_available, office_kind_for_extension
-from ...util.office_engines import NO_ENGINE_DETAILS, convert_office_to_pdf
+from ...util.office_engines import NO_ENGINE_DETAILS, convert_office_to_pdf, detect_office_suites
 from ...util.paths import atomic_write_bytes, output_path, require_inputs, safe_stem
 from ...util.soffice_runner import DEFAULT_TIMEOUT_SEC, convert_with_soffice, neutral_temp_root
 from ..stirling_core.common import open_pdf
@@ -18,11 +18,12 @@ class OfficeProcessor(BaseProcessor):
     engine_name = "office_bridge"
 
     def health(self):
-        binary = locate_binary("soffice", {})
+        suites = detect_office_suites()
+        binary = suites["libreoffice"]["path"]
         engines = {
-            "msword": com_available("msword"),
-            "msexcel": com_available("msexcel"),
-            "mspowerpoint": com_available("mspowerpoint"),
+            "msword": suites["msword"]["available"],
+            "msexcel": suites["msexcel"]["available"],
+            "mspowerpoint": suites["mspowerpoint"]["available"],
             "libreoffice": binary,
         }
         available = any(bool(value) for value in engines.values())

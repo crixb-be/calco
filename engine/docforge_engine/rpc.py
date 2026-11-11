@@ -98,6 +98,14 @@ def clear_history(params: dict[str, Any]) -> dict[str, Any]:
     return {"records": []}
 
 
+@rpc_method("detect_office_suites")
+def detect_office_suites_rpc(params: dict[str, Any]) -> dict[str, Any]:
+    from .util.office_engines import detect_office_suites
+
+    raw = params.get("binaryPath")
+    return {"suites": detect_office_suites(raw if isinstance(raw, str) else None)}
+
+
 @rpc_method("clear_temp_cache")
 def clear_temp_cache(params: dict[str, Any]) -> dict[str, Any]:
     del params

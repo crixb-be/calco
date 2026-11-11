@@ -103,7 +103,7 @@ export interface PlannedTask {
 
 export type ConversionPlan = { tasks: PlannedTask[]; summary: string } | { error: string };
 
-const ENGINE_LABEL: Record<string, string> = { office_bridge: "LibreOffice", stirling_core: "Stirling" };
+const ENGINE_LABEL: Record<string, string> = { office_bridge: "Office / LibreOffice", stirling_core: "Stirling" };
 
 export function planConversion(files: string[], target: TargetFormat, opts: ConversionOptions = {}): ConversionPlan {
   if (!files.length) return { error: "Añade al menos un archivo." };

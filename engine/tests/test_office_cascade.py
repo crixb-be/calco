@@ -155,3 +155,26 @@ def test_ffmpeg_popen_combines_no_window_and_process_group_flags(tmp_path, monke
     ffmpeg.FfmpegProcessor()._run(task, source, "mp4", [], Reporter())
     assert captured["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0)
     assert captured["creationflags"] & getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+
+
+def test_detect_office_suites_flags_invalid_configured_path(monkeypatch, tmp_path):
+    from docforge_engine.rpc import dispatch
+
+    monkeypatch.setattr(office_engines, "com_available", lambda kind: kind == "msword")
+    monkeypatch.setattr(office_engines, "locate_binary", lambda kind, options=None: None)
+    result = dispatch("detect_office_suites", {"binaryPath": str(tmp_path / "nope" / "soffice.exe")})
+    suites = result["suites"]
+    assert suites["msword"] == {"available": True}
+    assert suites["msexcel"]["available"] is False
+    lo = suites["libreoffice"]
+    assert lo["available"] is False and lo["configuredInvalid"] is True and lo["source"] is None
+
+
+def test_detect_office_suites_prefers_valid_configured_path(monkeypatch, tmp_path):
+    exe = tmp_path / "LibreOffice" / "program" / "soffice.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"")
+    monkeypatch.setattr(office_engines, "com_available", lambda kind: False)
+    suites = office_engines.detect_office_suites(str(tmp_path / "LibreOffice"))
+    lo = suites["libreoffice"]
+    assert lo == {"available": True, "path": str(exe), "source": "configured", "configuredInvalid": False}

@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 from ..errors import EngineError
-from .binaries import locate_binary
+from .binaries import _normalize as normalize_binary, locate_binary
 from .office_com import OfficeComError, com_available, convert_with_office_com, office_kind_for_extension
 from .paths import atomic_write_bytes, output_path, require_inputs, safe_stem
 from .soffice_runner import DEFAULT_TIMEOUT_SEC, convert_with_soffice, neutral_temp_root
@@ -21,6 +21,30 @@ NO_ENGINE_DETAILS = (
     "3) Indicar la ruta de soffice.exe (o LibreOffice Portable) en Ajustes.\n"
     "4) Para PDF→Word existe fallback pdf2docx."
 )
+
+
+def detect_office_suites(binary_path: str | None = None) -> dict:
+    """Per-suite availability for the Settings screen and ``health()``.
+
+    ``binary_path`` is the LibreOffice path saved in Settings (may be empty). When it is
+    set but invalid, auto-detection still runs and ``configuredInvalid`` flags the problem.
+    """
+    configured = (binary_path or "").strip()
+    # Validate the configured path on its own: locate_binary would silently fall back.
+    configured_path = normalize_binary("soffice", configured) if configured else None
+    configured_valid = configured_path is not None
+    libreoffice = str(configured_path) if configured_path else locate_binary("soffice", {})
+    return {
+        "msword": {"available": com_available("msword")},
+        "msexcel": {"available": com_available("msexcel")},
+        "mspowerpoint": {"available": com_available("mspowerpoint")},
+        "libreoffice": {
+            "available": libreoffice is not None,
+            "path": libreoffice,
+            "source": ("configured" if configured_valid else "auto") if libreoffice else None,
+            "configuredInvalid": bool(configured) and not configured_valid,
+        },
+    }
 
 
 def _no_engine() -> EngineError:
