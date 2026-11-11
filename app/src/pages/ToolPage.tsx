@@ -9,6 +9,7 @@ import { Button, Card } from "@/components/ui/primitives";
 import type { PdfPagesMetadataResult } from "@/contracts/rpc";
 import { engineRpc } from "@/lib/engine";
 import { useJobs } from "@/store/jobs";
+import { categoryForTool, useOutputDir } from "@/store/outputDirs";
 import { usePageGrid } from "@/store/pageGrid";
 
 interface Props {
@@ -33,7 +34,7 @@ export default function ToolPage({
   const gridItems = usePageGrid((state) => state.items);
   const clearGrid = usePageGrid((state) => state.clear);
   const [files, setFiles] = useState<string[]>([]);
-  const [outputDir, setOutputDir] = useState("");
+  const [outputDir, setOutputDir] = useOutputDir(categoryForTool(selectedTool));
   const [options, setOptions] = useState<Record<string, unknown>>({});
   const [metadata, setMetadata] = useState<PdfPagesMetadataResult[]>([]);
   const [metadataError, setMetadataError] = useState("");

@@ -23,6 +23,7 @@ import { Toaster } from "@/components/ui/toast";
 import type { DoclingViewerRequest } from "@/components/docling/DoclingDualViewer";
 import { listenToTaskEvents } from "@/lib/engine";
 import { useJobs } from "@/store/jobs";
+import { useOutputDirs } from "@/store/outputDirs";
 
 type Page = "home" | "tool" | "settings" | "converter" | "history";
 
@@ -40,11 +41,16 @@ export default function App() {
   const [activityOpen, setActivityOpen] = useState(false);
   const activeJobs = useActiveJobCount();
   const apply = useJobs((state) => state.apply);
+  const loadOutputDirs = useOutputDirs((state) => state.load);
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
     localStorage.setItem("docforge.theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    void loadOutputDirs();
+  }, [loadOutputDirs]);
 
   useEffect(() => {
     let off: (() => void) | undefined;
@@ -172,7 +178,7 @@ export default function App() {
         {page === "tool" && toolId === "docling_parse" && <DoclingView onBack={() => goHome()} initialPreview={viewerRequest} />}
         {page === "tool" && (toolId === "protect" || toolId === "unprotect") && <SecurityView toolId={toolId} onBack={() => goHome()} />}
         {page === "tool" && toolId !== "page_organizer" && toolId !== "docling_parse" && toolId !== "protect" && toolId !== "unprotect" && (
-          <ToolPage toolId={toolId} onBack={() => goHome()} viewerRequest={viewerRequest} onViewerRequestHandled={() => setViewerRequest(null)} />
+          <ToolPage key={toolId} toolId={toolId} onBack={() => goHome()} viewerRequest={viewerRequest} onViewerRequestHandled={() => setViewerRequest(null)} />
         )}
         {page === "converter" && <UniversalConverter onOpenActivity={() => setActivityOpen(true)} />}
         {page === "settings" && (

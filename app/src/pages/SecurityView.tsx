@@ -5,6 +5,7 @@ import FileDrop from "@/components/FileDrop";
 import { Button, Card, Input, Label } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
 import { useJobs } from "@/store/jobs";
+import { useOutputDir } from "@/store/outputDirs";
 
 type SecurityTool = "protect" | "unprotect";
 interface Props { toolId: SecurityTool; onBack: () => void; }
@@ -14,7 +15,7 @@ export default function SecurityView({ toolId, onBack }: Props) {
   const add = useJobs((state) => state.add);
   const showToast = useToast((state) => state.show);
   const [files, setFiles] = useState<string[]>([]);
-  const [outputDir, setOutputDir] = useState("");
+  const [outputDir, setOutputDir] = useOutputDir("pdf");
   const [password, setPassword] = useState("");
   const [ownerPassword, setOwnerPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

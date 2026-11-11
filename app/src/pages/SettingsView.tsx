@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, Moon, RefreshCw, Sun, Trash2, XCircle, Zap } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FolderOpen, HardDrive, Moon, RefreshCw, RotateCcw, Sun, Trash2, XCircle, Zap } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Badge, Button, Card, Input, Label } from "@/components/ui/primitives";
 import {
-  engineRpc, checkSystemHealth, detectOfficeSuites, getDefaultOutputDir, setDefaultOutputDir,
+  engineRpc, checkSystemHealth, detectOfficeSuites,
   type OfficeSuiteId, type OfficeSuites, type SystemHealth,
 } from "@/lib/engine";
 import type { ProcessorTask } from "@/contracts/task";
 import { useJobs } from "@/store/jobs";
+import { useOutputDirs, type OutputCategory } from "@/store/outputDirs";
 
 type Props = { theme: "dark" | "light"; onToggleTheme: () => void };
 
@@ -24,6 +25,13 @@ const SUITES: { id: OfficeSuiteId; label: string; formats: string }[] = [
   { id: "libreoffice", label: "LibreOffice", formats: "Respaldo para todos los formatos" },
 ];
 
+const OUTPUT_CATEGORIES: { category: OutputCategory; label: string; title: string }[] = [
+  { category: "pdf", label: "Documentos PDF", title: "Carpeta para documentos PDF" },
+  { category: "office", label: "Documentos Office (DOCX, XLSX, PPTX)", title: "Carpeta para documentos Office" },
+  { category: "image", label: "Imágenes (PNG, JPG, WebP)", title: "Carpeta para imágenes" },
+  { category: "media", label: "Multimedia (Audio / Video)", title: "Carpeta para multimedia" },
+];
+
 function suiteDetail(id: OfficeSuiteId, suites: OfficeSuites | null, loading: boolean) {
   if (loading) return "Detectando…";
   const status = suites?.[id];
@@ -38,7 +46,12 @@ function suiteDetail(id: OfficeSuiteId, suites: OfficeSuites | null, loading: bo
 
 export default function SettingsView({ theme, onToggleTheme }: Props) {
   const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [outputDir, setOutputDir] = useState("");
+  const general = useOutputDirs((state) => state.general);
+  const byCategory = useOutputDirs((state) => state.byCategory);
+  const setGeneral = useOutputDirs((state) => state.setGeneral);
+  const setCategory = useOutputDirs((state) => state.setCategory);
+  const clearCategory = useOutputDirs((state) => state.clearCategory);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [soffice, setSoffice] = useState(() => localStorage.getItem("docforge.soffice") ?? "");
   const [ffmpeg, setFfmpeg] = useState(() => localStorage.getItem("docforge.ffmpeg") ?? "");
   const [models, setModels] = useState(() => localStorage.getItem("docforge.models") ?? "");
@@ -62,7 +75,6 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
     void refreshSuites(soffice);
     try {
       setHealth(await checkSystemHealth());
-      setOutputDir((await getDefaultOutputDir()) ?? "");
     } catch (error) {
       setHealth({ sidecar_online: false, libreoffice_path: null, disk_free_bytes: null });
       setMessage(error instanceof Error ? error.message : String(error));
@@ -77,11 +89,18 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
     const selected = await open({ directory: true, multiple: false, title: "Carpeta de salida predeterminada" });
     if (typeof selected !== "string") return;
     try {
-      setOutputDir(await setDefaultOutputDir(selected));
+      await setGeneral(selected);
       setMessage("Carpeta de salida guardada.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
+  };
+
+  const chooseCategoryDir = async (category: OutputCategory, title: string) => {
+    const selected = await open({ directory: true, multiple: false, title });
+    if (typeof selected !== "string") return;
+    setCategory(category, selected);
+    setMessage("Carpeta por tipo guardada.");
   };
 
   const clearLocalData = async () => {
@@ -170,8 +189,24 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
         </Card>
 
         <Card className="p-4">
-          <h2 className="font-semibold">Guardado predeterminado</h2><p className="mt-1 text-xs text-muted-foreground">Los resultados nuevos usarán esta carpeta.</p>
-          <div className="mt-4 flex gap-2"><div className="min-w-0 flex-1 truncate rounded-md border bg-background/50 px-3 py-2 text-sm" title={outputDir}>{outputDir || "No configurada"}</div><Button variant="outline" className="h-10 w-10 shrink-0 px-0" onClick={() => void chooseOutputDir()}><FolderOpen size={16} /></Button></div>
+          <h2 className="font-semibold">Guardado predeterminado</h2><p className="mt-1 text-xs text-muted-foreground">Los resultados nuevos usarán esta carpeta; puedes definir rutas por tipo de formato.</p>
+          <div className="mt-4 flex gap-2"><div className="min-w-0 flex-1 truncate rounded-md border bg-background/50 px-3 py-2 text-sm" title={general}>{general || "No configurada"}</div><Button variant="outline" className="h-10 w-10 shrink-0 px-0" onClick={() => void chooseOutputDir()}><FolderOpen size={16} /></Button></div>
+          <div className="mt-4 border-t pt-3">
+            <button type="button" onClick={() => setCategoriesOpen((value) => !value)} aria-expanded={categoriesOpen} className="flex w-full items-center justify-between text-left text-sm font-semibold">
+              <span className="flex items-center gap-2">{categoriesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />} Rutas por tipo de formato</span>
+            </button>
+            {categoriesOpen && <div className="mt-3 space-y-2">
+              {OUTPUT_CATEGORIES.map(({ category, label, title }) => {
+                const path = byCategory[category];
+                const display = path || (general ? `Hereda: ${general}` : "Hereda la general");
+                return <div key={category} className="flex items-center gap-2 rounded-md border bg-background/30 p-2">
+                  <div className="min-w-0 flex-1"><p className="text-xs font-semibold">{label}</p><p className={`truncate text-xs ${path ? "text-foreground" : "text-muted-foreground"}`} title={display}>{display}</p></div>
+                  <Button type="button" variant="outline" className="h-8 w-8 shrink-0 px-0" title={title} aria-label={title} onClick={() => void chooseCategoryDir(category, title)}><FolderOpen size={14} /></Button>
+                  <Button type="button" variant="ghost" className="h-8 w-8 shrink-0 px-0" title="Heredar la carpeta general" aria-label={`Limpiar ${label}`} disabled={!path} onClick={() => { clearCategory(category); setMessage("Carpeta por tipo eliminada."); }}><RotateCcw size={14} /></Button>
+                </div>;
+              })}
+            </div>}
+          </div>
         </Card>
       </div>
 

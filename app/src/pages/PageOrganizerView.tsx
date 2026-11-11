@@ -7,6 +7,7 @@ import { Button, Card } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
 import { engineRpc } from "@/lib/engine";
 import { useJobs } from "@/store/jobs";
+import { useOutputDir } from "@/store/outputDirs";
 
 interface Props { onBack: () => void; }
 type PageItem = OrganizerThumbnail;
@@ -51,7 +52,7 @@ export default function PageOrganizerView({ onBack }: Props) {
   const add = useJobs((state) => state.add);
   const showToast = useToast((state) => state.show);
   const [files, setFiles] = useState<string[]>([]);
-  const [outputDir, setOutputDir] = useState("");
+  const [outputDir, setOutputDir] = useOutputDir("pdf");
   const [pages, setPages] = useState<PageItem[]>([]);
   const [original, setOriginal] = useState<PageItem[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);

@@ -6,6 +6,7 @@ import { Button, Card, Label } from "@/components/ui/primitives";
 import { engineRpc } from "@/lib/engine";
 import { useToast } from "@/components/ui/toast";
 import { useJobs } from "@/store/jobs";
+import { useOutputDir } from "@/store/outputDirs";
 
 type ExportFormat = "md" | "json" | "html";
 interface PreviewSeed { markdownPath: string; }
@@ -19,7 +20,7 @@ export default function DoclingView({ onBack, initialPreview }: Props) {
   const jobs = useJobs((state) => state.jobs);
   const showToast = useToast((state) => state.show);
   const [files, setFiles] = useState<string[]>([]);
-  const [outputDir, setOutputDir] = useState("");
+  const [outputDir, setOutputDir] = useOutputDir(null);
   const [format, setFormat] = useState<ExportFormat>("md");
   const [preview, setPreview] = useState(initialPreview?.markdownPath ?? "");
   const [previewText, setPreviewText] = useState("");
