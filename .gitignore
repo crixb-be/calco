@@ -1,0 +1,17 @@
+.pytest-tmp/
+**/.pytest-tmp/
+**/__pycache__/
+engine/build/
+engine/dist/
+engine/*.spec
+engine/.pytest_cache/
+app/node_modules/
+app/dist/
+app/src-tauri/target/
+app/src-tauri/binaries/docforge-engine*
+.npm-cache/
+dist/
+engine/.venv/
+**/.venv/
+*.egg-info/
+Pruebas/

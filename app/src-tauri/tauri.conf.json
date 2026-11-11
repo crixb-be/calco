@@ -1,0 +1,50 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "productName": "DocForge Desktop",
+  "version": "0.1.0",
+  "identifier": "com.docforge.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DocForge Desktop",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
+    },
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "externalBin": ["binaries/docforge-engine"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "startMenuFolder": "DocForge Desktop",
+        "displayLanguageSelector": false,
+        "compression": "lzma"
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": false
+    }
+  }
+}
