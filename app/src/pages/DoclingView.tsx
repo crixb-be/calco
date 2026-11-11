@@ -86,7 +86,7 @@ export default function DoclingView({ onBack, initialPreview }: Props) {
       </button>
       <div className="flex items-start gap-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300"><ScanText size={18} /></div>
-        <div><p className="eyebrow">Docling · Parser inteligente</p><h1 className="text-xl font-bold">Parser Inteligente</h1><p className="mt-0.5 text-sm text-muted-foreground">Extrae estructura, tablas y texto de PDFs o imágenes.</p></div>
+        <div><p className="eyebrow">Extracción IA · Parser inteligente</p><h1 className="text-xl font-bold">Parser Inteligente</h1><p className="mt-0.5 text-sm text-muted-foreground">Extrae estructura, tablas y texto de PDFs o imágenes.</p></div>
       </div>
       <Card className="space-y-4 p-5">
         <FileDrop tool={parserTool} files={files} onChange={setFiles} outputDir={outputDir} onOutputDirChange={setOutputDir} />

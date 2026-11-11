@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Info, LoaderCircle, Play } from "lucide-react";
-import { INTERNAL_ACTIONS, toolById, tools } from "@/catalog/tools";
+import { domains, INTERNAL_ACTIONS, toolById, tools } from "@/catalog/tools";
 import FileDrop from "@/components/FileDrop";
 import ToolForm, { initialOptions } from "@/components/ToolForm";
 import PageGridManager, { pageSequence } from "@/components/pages/PageGridManager";
@@ -184,7 +184,7 @@ export default function ToolPage({
           <Icon size={22} />
         </div>
         <div>
-          <p className="eyebrow">{selectedTool.engine.replace("_", " ")}</p>
+          <p className="eyebrow">{domains.find((item) => item.id === selectedTool.domain)?.label ?? selectedTool.domain}</p>
           <h1 className="text-xl font-bold">{selectedTool.label}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{selectedTool.description}</p>
         </div>

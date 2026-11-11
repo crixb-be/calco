@@ -172,7 +172,7 @@ export default function PdfEditorView() {
   }
 
   return <div className="w-full space-y-4 p-6 lg:p-8">
-    <div className="flex items-start gap-4"><div className="rounded-lg bg-primary/10 p-2 text-primary"><PenTool size={18} /></div><div><p className="eyebrow">Stirling-PDF Core</p><h1 className="text-xl font-bold">Editar PDF</h1><p className="mt-0.5 text-sm text-muted-foreground">Edita texto, imágenes y anotaciones sin salir de DocForge.</p></div></div>
+    <div className="flex items-start gap-4"><div className="rounded-lg bg-primary/10 p-2 text-primary"><PenTool size={18} /></div><div><p className="eyebrow">Herramientas PDF</p><h1 className="text-xl font-bold">Editar PDF</h1><p className="mt-0.5 text-sm text-muted-foreground">Edita texto, imágenes y anotaciones sin salir de DocForge.</p></div></div>
     <Card className="space-y-4 p-4">
       <FileDrop tool={editorTool} files={files} onChange={setFiles} outputDir={outputDir} onOutputDirChange={setOutputDir} />
       <Toolbar tool={tool} selected={selected} textDefaults={textDefaults} strokeDefaults={strokeDefaults} shapeDefaults={shapeDefaults} highlightColor={highlightColor} canUndo={past.length > 0} canRedo={future.length > 0} exportDisabled={!files[0] || !outputDir || !elements.length} onExport={() => void exportPdf()} onTool={changeTool} onImage={() => void chooseImage()} onUpdateSelected={updateSelected} onUpdateTool={updateTool} onUndo={undo} onRedo={redo} onDelete={() => selectedId && removeElement(selectedId)} />

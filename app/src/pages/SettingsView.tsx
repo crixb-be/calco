@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FolderOpen, HardDrive, Moon, RefreshCw, RotateCcw, Sun, Trash2, XCircle, Zap } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FolderOpen, HardDrive, RefreshCw, RotateCcw, Trash2, XCircle, Zap } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Badge, Button, Card, Input, Label } from "@/components/ui/primitives";
 import {
@@ -10,7 +10,6 @@ import type { ProcessorTask } from "@/contracts/task";
 import { useJobs } from "@/store/jobs";
 import { useOutputDirs, type OutputCategory } from "@/store/outputDirs";
 
-type Props = { theme: "dark" | "light"; onToggleTheme: () => void };
 
 const formatBytes = (bytes: number | null) => {
   if (bytes === null) return "No disponible";
@@ -44,7 +43,7 @@ function suiteDetail(id: OfficeSuiteId, suites: OfficeSuites | null, loading: bo
   return `${status.source === "configured" ? "Ruta de Ajustes" : "Detectado"}: ${status.path}`;
 }
 
-export default function SettingsView({ theme, onToggleTheme }: Props) {
+export default function SettingsView() {
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const general = useOutputDirs((state) => state.general);
   const byCategory = useOutputDirs((state) => state.byCategory);
@@ -148,7 +147,6 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
     <div className="mx-auto max-w-5xl space-y-4 p-6 lg:p-8">
       <div className="flex items-center justify-between gap-3">
         <div><p className="eyebrow">Preferencias locales</p><h1 className="mt-1 text-2xl font-bold">Ajustes</h1></div>
-        <Button variant="outline" onClick={onToggleTheme}>{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />} {theme === "dark" ? "Tema claro" : "Tema oscuro"}</Button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">

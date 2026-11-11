@@ -62,7 +62,7 @@ export const INTERNAL_ACTIONS = ["apply_page_plan"] as const;
 export const domains: { id: Domain; label: string; description: string }[] = [
   {
     id: "stirling",
-    label: "Stirling-PDF Core",
+    label: "Herramientas PDF",
     description: "Organización, seguridad y edición de PDF",
   },
   {
@@ -72,7 +72,7 @@ export const domains: { id: Domain; label: string; description: string }[] = [
   },
   {
     id: "docling",
-    label: "Docling AI Export",
+    label: "Extracción IA",
     description: "Extracción estructurada y modelos locales",
   },
   {

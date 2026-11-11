@@ -109,7 +109,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="relative z-50 flex w-[250px] shrink-0 flex-col border-r bg-card">
+      <aside className="sticky top-0 z-50 flex h-screen w-[250px] shrink-0 flex-col overflow-hidden border-r bg-card">
         <div className="flex items-center gap-3 border-b px-5 py-5">
           <div className="rounded-lg bg-primary p-2 text-primary-foreground">
             <FileStack size={20} />
@@ -119,7 +119,7 @@ export default function App() {
             <p className="text-[10px] uppercase tracking-[.18em] text-muted-foreground">Desktop</p>
           </div>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {(() => {
             const active = page === "home" && !domain && !activityOpen;
             return (
@@ -169,7 +169,7 @@ export default function App() {
             );
           })}
         </nav>
-        <div className="space-y-1 border-t bg-background/30 p-3">
+        <div className="mt-auto shrink-0 space-y-1 border-t bg-background/30 p-3">
           <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Sistema</p>
           <button
             type="button"
@@ -198,6 +198,12 @@ export default function App() {
         {page === "home" && (
           <Home
             activeDomain={domain}
+            onOpenConverter={() => goHome("conversor")}
+            onOpenEditor={() => {
+              setActivityOpen(false);
+              setDomain(undefined);
+              setPage("pdf_editor");
+            }}
             onSelect={(id) => {
               setToolId(id);
               setViewerRequest(null);
@@ -213,10 +219,7 @@ export default function App() {
         )}
         {page === "converter" && <UniversalConverter onOpenActivity={() => setActivityOpen(true)} />}
         {page === "settings" && (
-          <SettingsView
-            theme={theme}
-            onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
-          />
+          <SettingsView />
         )}
         {page === "history" && <HistoryView onBack={() => goHome()} />}
         {page === "pdf_editor" && <PdfEditorView />}
