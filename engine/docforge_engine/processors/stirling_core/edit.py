@@ -32,6 +32,12 @@ def _annotation_color(value, name: str = "color") -> tuple[float, float, float]:
     return tuple(int(value[index:index + 2], 16) / 255 for index in (1, 3, 5))
 
 
+def _annotation_fill(value, name: str = "fill") -> tuple[float, float, float] | None:
+    if value is None:
+        return None
+    return _annotation_color(value, name)
+
+
 class PdfEditProcessor(BaseProcessor):
     engine_name = "stirling_core"
 
@@ -66,9 +72,10 @@ class PdfEditProcessor(BaseProcessor):
                         "text": annotation["text"],
                         "font": annotation.get("font", "helv"),
                         "bold": annotation.get("bold", False),
+                        "italic": annotation.get("italic", False),
                     }
-                    if item["font"] not in {"helv", "tiro", "cour"} or not isinstance(item["bold"], bool):
-                        raise EngineError("INVALID_TASK", "font o bold inválido")
+                    if item["font"] not in {"helv", "tiro", "cour"} or not isinstance(item["bold"], bool) or not isinstance(item["italic"], bool):
+                        raise EngineError("INVALID_TASK", "font, bold o italic inválido")
                     if item["size"] <= 0:
                         raise EngineError("INVALID_TASK", "size debe ser mayor que cero")
                 elif kind == "ink":
@@ -103,8 +110,15 @@ class PdfEditProcessor(BaseProcessor):
                     stroke_width = _annotation_number(annotation.get("width"), "width")
                     if width < 0 or height < 0 or stroke_width <= 0:
                         raise EngineError("INVALID_TASK", "Rectángulo inválido")
-                    item = {"kind": kind, "x": _annotation_number(annotation.get("x"), "x"), "y": _annotation_number(annotation.get("y"), "y"), "w": width, "h": height, "width": stroke_width, "color": _annotation_color(annotation.get("color"))}
-                elif kind == "line":
+                    item = {"kind": kind, "x": _annotation_number(annotation.get("x"), "x"), "y": _annotation_number(annotation.get("y"), "y"), "w": width, "h": height, "width": stroke_width, "color": _annotation_color(annotation.get("color")), "fill": _annotation_fill(annotation.get("fill"))}
+                elif kind == "ellipse":
+                    width = _annotation_number(annotation.get("w"), "w")
+                    height = _annotation_number(annotation.get("h"), "h")
+                    stroke_width = _annotation_number(annotation.get("width"), "width")
+                    if width < 0 or height < 0 or stroke_width <= 0:
+                        raise EngineError("INVALID_TASK", "Elipse inválida")
+                    item = {"kind": kind, "x": _annotation_number(annotation.get("x"), "x"), "y": _annotation_number(annotation.get("y"), "y"), "w": width, "h": height, "width": stroke_width, "color": _annotation_color(annotation.get("color")), "fill": _annotation_fill(annotation.get("fill"))}
+                elif kind in {"line", "arrow"}:
                     stroke_width = _annotation_number(annotation.get("width"), "width")
                     if stroke_width <= 0:
                         raise EngineError("INVALID_TASK", "width debe ser mayor que cero")
@@ -141,6 +155,18 @@ class PdfEditProcessor(BaseProcessor):
                 ]
                 return fitz.Rect(min(point.x for point in corners), min(point.y for point in corners), max(point.x for point in corners), max(point.y for point in corners))
 
+            def arrow_points(annotation):
+                dx = annotation["x2"] - annotation["x1"]
+                dy = annotation["y2"] - annotation["y1"]
+                angle = math.atan2(dy, dx)
+                length = max(8.0, annotation["width"] * 4)
+                spread = math.radians(28)
+                return [
+                    (annotation["x2"], annotation["y2"]),
+                    (annotation["x2"] - math.cos(angle - spread) * length, annotation["y2"] - math.sin(angle - spread) * length),
+                    (annotation["x2"] - math.cos(angle + spread) * length, annotation["y2"] - math.sin(angle + spread) * length),
+                ]
+
             for number, page in enumerate(doc):
                 reporter.check_cancelled()
                 for annotation in per_page[number]:
@@ -150,7 +176,12 @@ class PdfEditProcessor(BaseProcessor):
                         for line_number, line in enumerate(annotation["text"].split("\n")):
                             # The UI positions a div at y with CSS line-height 1.2; PyMuPDF needs its baseline.
                             point = display_point(page, annotation["x"], annotation["y"] + size * (line_number * 1.2 + 0.8))
-                            font = {"helv": "hebo", "tiro": "tibo", "cour": "cobo"}[annotation["font"]] if annotation["bold"] else annotation["font"]
+                            font = {
+                                (False, False): {"helv": "helv", "tiro": "tiro", "cour": "cour"},
+                                (True, False): {"helv": "hebo", "tiro": "tibo", "cour": "cobo"},
+                                (False, True): {"helv": "heit", "tiro": "tiit", "cour": "coit"},
+                                (True, True): {"helv": "hebi", "tiro": "tibi", "cour": "cobi"},
+                            }[(annotation["bold"], annotation["italic"])][annotation["font"]]
                             page.insert_text(point, line, fontsize=size, color=color, fontname=font, overlay=True)
                     elif annotation["kind"] == "ink":
                         points = [display_point(page, x, y) for x, y in annotation["points"]]
@@ -158,11 +189,19 @@ class PdfEditProcessor(BaseProcessor):
                     elif annotation["kind"] == "highlight":
                         page.draw_rect(display_rect(page, annotation), color=None, fill=color, fill_opacity=0.35, overlay=True)
                     elif annotation["kind"] == "rect":
-                        page.draw_rect(display_rect(page, annotation), color=color, width=annotation["width"], overlay=True)
+                        page.draw_rect(display_rect(page, annotation), color=color, fill=annotation["fill"], width=annotation["width"], overlay=True)
+                    elif annotation["kind"] == "ellipse":
+                        page.draw_oval(display_rect(page, annotation), color=color, fill=annotation["fill"], width=annotation["width"], overlay=True)
                     elif annotation["kind"] == "line":
                         start = display_point(page, annotation["x1"], annotation["y1"])
                         end = display_point(page, annotation["x2"], annotation["y2"])
                         page.draw_line(start, end, color=color, width=annotation["width"], lineCap=1, overlay=True)
+                    elif annotation["kind"] == "arrow":
+                        start = display_point(page, annotation["x1"], annotation["y1"])
+                        end = display_point(page, annotation["x2"], annotation["y2"])
+                        head = [display_point(page, x, y) for x, y in arrow_points(annotation)]
+                        page.draw_line(start, end, color=color, width=annotation["width"], lineCap=1, overlay=True)
+                        page.draw_polyline(head, color=color, fill=color, width=annotation["width"], lineCap=1, lineJoin=1, closePath=True, overlay=True)
                     elif annotation["kind"] == "image":
                         page.insert_image(display_rect(page, annotation), filename=annotation["path"], keep_proportion=False, overlay=True, rotate=int(page.rotation) % 360)
                 reporter.report((number + 1) * 100 / len(doc), f"Editada página {number + 1}")

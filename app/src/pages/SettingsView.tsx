@@ -190,7 +190,7 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
 
         <Card className="p-4">
           <h2 className="font-semibold">Guardado predeterminado</h2><p className="mt-1 text-xs text-muted-foreground">Los resultados nuevos usarán esta carpeta; puedes definir rutas por tipo de formato.</p>
-          <div className="mt-4 flex gap-2"><div className="min-w-0 flex-1 truncate rounded-md border bg-background/50 px-3 py-2 text-sm" title={general}>{general || "No configurada"}</div><Button variant="outline" className="h-10 w-10 shrink-0 px-0" onClick={() => void chooseOutputDir()}><FolderOpen size={16} /></Button></div>
+          <div className="mt-4 flex gap-2"><div className="min-w-0 flex-1 truncate rounded-md border bg-background/50 px-3 py-2 text-sm" title={general}>{general || "No configurada"}</div><Button variant="outline" size="icon" className="shrink-0" onClick={() => void chooseOutputDir()}><FolderOpen size={16} /></Button></div>
           <div className="mt-4 border-t pt-3">
             <button type="button" onClick={() => setCategoriesOpen((value) => !value)} aria-expanded={categoriesOpen} className="flex w-full items-center justify-between text-left text-sm font-semibold">
               <span className="flex items-center gap-2">{categoriesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />} Rutas por tipo de formato</span>
@@ -221,7 +221,7 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
         <div className="grid gap-3 md:grid-cols-2">
           <div><Label htmlFor="settings-soffice">Ruta de LibreOffice (opcional)</Label><Input id="settings-soffice" value={soffice} onChange={(event) => setSoffice(event.target.value)} placeholder="Detectar automaticamente" /></div>
           <div><Label htmlFor="settings-ffmpeg">Ruta de FFmpeg</Label><Input id="settings-ffmpeg" value={ffmpeg} onChange={(event) => setFfmpeg(event.target.value)} placeholder="Detectar automaticamente" /></div>
-          <div className="md:col-span-2"><Label htmlFor="settings-models">Carpeta de modelos Docling</Label><div className="mt-1 flex gap-2"><Input id="settings-models" value={models} onChange={(event) => setModels(event.target.value)} placeholder="Selecciona una carpeta para los modelos" /><Button variant="outline" className="h-10 w-10 shrink-0 px-0" onClick={() => void chooseModelsDir()}><FolderOpen size={16} /></Button></div></div>
+          <div className="md:col-span-2"><Label htmlFor="settings-models">Carpeta de modelos Docling</Label><div className="mt-1 flex gap-2"><Input id="settings-models" value={models} onChange={(event) => setModels(event.target.value)} placeholder="Selecciona una carpeta para los modelos" /><Button variant="outline" size="icon" className="shrink-0" onClick={() => void chooseModelsDir()}><FolderOpen size={16} /></Button></div></div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={saveLocalPaths}><Zap size={15} /> Guardar rutas</Button>

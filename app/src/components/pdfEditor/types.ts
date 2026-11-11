@@ -1,5 +1,5 @@
 export type PdfFont = "helv" | "tiro" | "cour";
-export type EditorTool = "pointer" | "text" | "image" | "ink" | "highlight" | "rect" | "line";
+export type EditorTool = "pointer" | "text" | "image" | "ink" | "highlight" | "rect" | "ellipse" | "arrow" | "line";
 
 export interface ElementBase {
   id: string;
@@ -15,6 +15,7 @@ export interface TextElement extends ElementBase {
   text: string;
   font: PdfFont;
   bold: boolean;
+  italic: boolean;
   size: number;
   color: string;
 }
@@ -52,6 +53,18 @@ export interface RectElement extends ElementBase {
   h: number;
   color: string;
   width: number;
+  fill: string | null;
+}
+
+export interface EllipseElement extends ElementBase {
+  kind: "ellipse";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string;
+  width: number;
+  fill: string | null;
 }
 
 export interface LineElement extends ElementBase {
@@ -64,7 +77,17 @@ export interface LineElement extends ElementBase {
   width: number;
 }
 
-export type PdfElement = TextElement | ImageElement | InkElement | HighlightElement | RectElement | LineElement;
+export interface ArrowElement extends ElementBase {
+  kind: "arrow";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+  width: number;
+}
+
+export type PdfElement = TextElement | ImageElement | InkElement | HighlightElement | RectElement | EllipseElement | LineElement | ArrowElement;
 
 export function cloneElements(elements: PdfElement[]): PdfElement[] {
   return elements.map((element) => element.kind === "ink"
@@ -82,5 +105,7 @@ export function elementLabel(element: PdfElement): string {
   if (element.kind === "ink") return "Dibujo";
   if (element.kind === "highlight") return "Resaltado";
   if (element.kind === "rect") return "Rectángulo";
+  if (element.kind === "ellipse") return "Círculo / Elipse";
+  if (element.kind === "arrow") return "Flecha";
   return "Línea";
 }

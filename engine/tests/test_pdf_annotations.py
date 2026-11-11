@@ -74,6 +74,34 @@ def test_apply_pdf_annotations_image_on_rotated_page(tmp_path):
         assert expected.contains(rects[0])
 
 
+def test_apply_pdf_annotations_shapes_and_italic_text(tmp_path):
+    source = make_pdf(tmp_path / "source.pdf")
+    outputs, meta = run_annotations(source, tmp_path, [
+        {"id": "rect-fill", "page": 0, "kind": "rect", "x": 30, "y": 180, "w": 70, "h": 35, "color": "#2563eb", "fill": "#bfdbfe", "width": 3},
+        {"id": "ellipse-fill", "page": 0, "kind": "ellipse", "x": 130, "y": 180, "w": 80, "h": 40, "color": "#16a34a", "fill": "#bbf7d0", "width": 2},
+        {"id": "arrow", "page": 0, "kind": "arrow", "x1": 40, "y1": 260, "x2": 180, "y2": 300, "color": "#dc2626", "width": 3},
+        {"id": "italic", "page": 0, "kind": "text", "x": 40, "y": 340, "text": "Italic text", "font": "helv", "bold": False, "italic": True, "size": 14, "color": "#111827"},
+        {"id": "bold-italic", "page": 0, "kind": "text", "x": 40, "y": 370, "text": "Bold italic text", "font": "tiro", "bold": True, "italic": True, "size": 14, "color": "#111827"},
+    ])
+    assert meta["annotations"] == 5
+    with fitz.open(outputs[0]) as document:
+        page = document[0]
+        text = page.get_text()
+        assert "Italic text" in text
+        assert "Bold italic text" in text
+        drawings = page.get_drawings()
+        assert any(drawing.get("fill") for drawing in drawings)
+        assert len(drawings) >= 3
+
+
+def test_apply_pdf_annotations_old_style_payload_without_new_fields(tmp_path):
+    source = make_pdf(tmp_path / "source.pdf")
+    outputs, _ = run_annotations(source, tmp_path, [{"id": "old-text", "page": 0, "kind": "text", "x": 50, "y": 100, "text": "Old payload", "font": "helv", "bold": False, "size": 12, "color": "#111111"}, {"id": "old-rect", "page": 0, "kind": "rect", "x": 50, "y": 120, "w": 40, "h": 20, "color": "#111111", "width": 1}])
+    with fitz.open(outputs[0]) as document:
+        assert "Old payload" in document[0].get_text()
+        assert document[0].get_drawings()
+
+
 def test_apply_pdf_annotations_rejects_invalid_image_path(tmp_path):
     source = make_pdf(tmp_path / "source.pdf")
     with pytest.raises(EngineError) as error:
