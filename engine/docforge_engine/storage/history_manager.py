@@ -76,3 +76,16 @@ class HistoryManager:
                 self.path.unlink()
             except FileNotFoundError:
                 pass
+
+
+_manager: HistoryManager | None = None
+_manager_lock = threading.Lock()
+
+
+def get_history_manager() -> HistoryManager:
+    """Return the process-wide history manager used by tasks and RPCs."""
+    global _manager
+    with _manager_lock:
+        if _manager is None:
+            _manager = HistoryManager()
+        return _manager

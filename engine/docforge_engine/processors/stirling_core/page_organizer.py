@@ -8,7 +8,7 @@ from typing import Any
 from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.paths import atomic_save, output_path, safe_stem
-from .common import one_input, pymupdf_module
+from .common import one_input, open_pdf, pymupdf_module
 
 MAX_LEGACY_THUMBNAIL_PAGES = 50
 
@@ -26,7 +26,7 @@ def _rotation(value: Any) -> int:
 def render_page_thumbnails(source: Path) -> list[dict[str, Any]]:
     """Render all pages at 72 DPI without retaining PyMuPDF objects after return."""
     pymupdf = pymupdf_module()
-    document = pymupdf.open(str(source))
+    document = open_pdf(pymupdf, source)
     try:
         if document.page_count > MAX_LEGACY_THUMBNAIL_PAGES:
             raise EngineError(
@@ -76,7 +76,7 @@ class PdfPageOrganizerProcessor(BaseProcessor):
         if not isinstance(raw_pages, list) or not raw_pages:
             raise EngineError("INVALID_TASK", "apply_page_layout.pages debe ser una lista no vacía")
 
-        document = pymupdf.open(str(source))
+        document = open_pdf(pymupdf, source)
         result = pymupdf.open()
         try:
             normalized: list[tuple[int, int]] = []

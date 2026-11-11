@@ -7,7 +7,7 @@ from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.pages import page_ranges
 from ...util.paths import atomic_save, output_path, safe_stem
-from .common import fitz_module, one_input
+from .common import fitz_module, one_input, open_pdf
 
 
 PRESETS = {
@@ -26,7 +26,7 @@ class PdfEditProcessor(BaseProcessor):
     def redact(self, task, reporter):
         fitz = fitz_module()
         source = one_input(task)
-        doc = fitz.open(source)
+        doc = open_pdf(fitz, source)
         try:
             terms = [str(term) for term in task.options.get("terms", [])]
             patterns = [re.compile(str(pattern), re.IGNORECASE) for pattern in task.options.get("regex", [])]
@@ -69,7 +69,7 @@ class PdfEditProcessor(BaseProcessor):
     def page_numbers(self, task, reporter):
         fitz = fitz_module()
         source = one_input(task)
-        doc = fitz.open(source)
+        doc = open_pdf(fitz, source)
         try:
             position = str(task.options.get("position", "bottom-right")).lower()
             fmt = str(task.options.get("format", "{n}/{total}"))
@@ -99,7 +99,7 @@ class PdfEditProcessor(BaseProcessor):
     def watermark(self, task, reporter):
         fitz = fitz_module()
         source = one_input(task)
-        doc = fitz.open(source)
+        doc = open_pdf(fitz, source)
         try:
             text = task.options.get("text")
             image_path = task.options.get("imagePath")
@@ -139,7 +139,7 @@ class PdfEditProcessor(BaseProcessor):
     def flatten(self, task, reporter):
         fitz = fitz_module()
         source = one_input(task)
-        original = fitz.open(source)
+        original = open_pdf(fitz, source)
         flattened = fitz.open()
         try:
             for number, page in enumerate(original):

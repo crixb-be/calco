@@ -12,7 +12,7 @@ from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.pages import page_ranges
 from ...util.paths import atomic_write_bytes, output_path, safe_stem
-from ..stirling_core.common import one_input, pymupdf_module
+from ..stirling_core.common import one_input, open_pdf, pymupdf_module
 from .image_converter import encode, parse_quality, prepare_mode
 
 
@@ -58,7 +58,7 @@ def render_pdf_to_images(
     output_dir = Path(output_dir).expanduser().absolute()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    doc = pymupdf.open(str(source))
+    doc = open_pdf(pymupdf, source)
     try:
         selected = page_ranges(pages, len(doc))
         outputs: list[Path] = []

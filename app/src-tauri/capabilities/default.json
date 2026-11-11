@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Permisos mínimos para la aplicación de escritorio DocForge.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save", "opener:default", "shell:allow-execute", "shell:allow-spawn", "shell:allow-kill"]
+  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save", "opener:default"]
 }

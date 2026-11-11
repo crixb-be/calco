@@ -15,10 +15,12 @@ from .errors import EngineError
 from .core.cleanup import purge_temp_artifacts
 from .util.thumbnail_generator import get_service
 from .processors.stirling_core.page_organizer import render_page_thumbnails
-from .storage.history_manager import HistoryManager
+from .storage.history_manager import get_history_manager
 
 READABLE_EXTENSIONS = {".md", ".json", ".html", ".htm", ".txt", ".doctags"}
 DEFAULT_MAX_BYTES = 20 * 1024 * 1024
+MAX_READ_BYTES = 50 * 1024 * 1024
+EXPORT_EXTENSIONS = READABLE_EXTENSIONS | {".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg", ".webp"}
 
 RpcMethod = Callable[[dict[str, Any]], dict[str, Any]]
 METHODS: dict[str, RpcMethod] = {}
@@ -86,13 +88,13 @@ def get_pdf_thumbnails(params: dict[str, Any]) -> dict[str, Any]:
 @rpc_method("get_history")
 def get_history(params: dict[str, Any]) -> dict[str, Any]:
     del params
-    return {"records": HistoryManager().list()}
+    return {"records": get_history_manager().list()}
 
 
 @rpc_method("clear_history")
 def clear_history(params: dict[str, Any]) -> dict[str, Any]:
     del params
-    HistoryManager().clear()
+    get_history_manager().clear()
     return {"records": []}
 
 
@@ -124,8 +126,9 @@ def read_text_file(params: dict[str, Any]) -> dict[str, Any]:
         raise EngineError("INVALID_TASK", f"Extensión no permitida para lectura: {path.suffix or '(sin extensión)'}")
     max_bytes = _int(params, "maxBytes", DEFAULT_MAX_BYTES)
     size = path.stat().st_size
-    if size > max_bytes:
-        raise EngineError("INVALID_TASK", f"Archivo demasiado grande ({size} bytes > {max_bytes})")
+    effective_max = min(max_bytes, MAX_READ_BYTES)
+    if size > effective_max:
+        raise EngineError("INVALID_TASK", f"Archivo demasiado grande ({size} bytes > {effective_max})")
     content = path.read_bytes().decode("utf-8", errors="replace")
     return {"content": content, "size": size}
 
@@ -134,6 +137,20 @@ def read_text_file(params: dict[str, Any]) -> dict[str, Any]:
 def export_file(params: dict[str, Any]) -> dict[str, Any]:
     source = _abs_path(params, "sourcePath")
     target = _abs_path(params, "targetPath", must_exist=False)
+    source_ext = source.suffix.lower()
+    if source_ext not in EXPORT_EXTENSIONS:
+        raise EngineError("INVALID_TASK", f"ExtensiÃ³n no permitida para exportaciÃ³n: {source.suffix or '(sin extensiÃ³n)'}")
+    if target.suffix.lower() != source_ext:
+        raise EngineError("INVALID_TASK", "La extensiÃ³n de destino debe coincidir con la de origen")
+    forbidden = [
+        Path(os.environ.get("WINDIR", os.environ.get("SystemRoot", r"C:\\Windows"))),
+        Path(os.environ.get("ProgramFiles", r"C:\\Program Files")),
+        Path(os.environ.get("ProgramFiles(x86)", r"C:\\Program Files (x86)")),
+        Path(__file__).resolve().parents[1],
+    ]
+    target_resolved = target.resolve()
+    if any(target_resolved == root.resolve() or root.resolve() in target_resolved.parents for root in forbidden):
+        raise EngineError("INVALID_TASK", "Destino de exportaciÃ³n no permitido")
     if os.path.normcase(str(source)) == os.path.normcase(str(target)):
         return {"path": str(target)}
     target.parent.mkdir(parents=True, exist_ok=True)

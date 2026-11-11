@@ -7,7 +7,7 @@ from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.pages import page_ranges
 from ...util.paths import atomic_write_bytes, output_path, require_inputs, safe_stem
-from .common import fitz_module, one_input
+from .common import fitz_module, one_input, open_pdf
 
 
 class PdfConvertProcessor(BaseProcessor):
@@ -33,7 +33,7 @@ class PdfConvertProcessor(BaseProcessor):
         fitz = fitz_module()
         source = one_input(task)
         minimum = int(task.options.get("minSize", 0))
-        doc = fitz.open(source)
+        doc = open_pdf(fitz, source)
         outputs = []
         seen = set()
         try:
@@ -98,7 +98,7 @@ class PdfConvertProcessor(BaseProcessor):
     def pdf_to_html(self, task, reporter):
         fitz = fitz_module()
         source = one_input(task)
-        doc = fitz.open(source)
+        doc = open_pdf(fitz, source)
         try:
             pieces = ["<!doctype html><html><head><meta charset='utf-8'><title>DocForge PDF</title></head><body>"]
             for number, page in enumerate(doc):

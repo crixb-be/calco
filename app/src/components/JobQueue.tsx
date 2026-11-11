@@ -7,6 +7,18 @@ import { doclingViewerRequest, type DoclingViewerRequest } from "@/components/do
 
 export const isActiveJob = (job: Job) => job.status === "running" || job.status === "queued" || job.status === "cancelling";
 
+const compressionSummary = (job: Job) => {
+  if (job.task.action !== "compress_pdf") return null;
+  const inputBytes = job.meta?.inputBytes;
+  const outputBytes = job.meta?.outputBytes;
+  if (typeof inputBytes !== "number" || typeof outputBytes !== "number" || inputBytes <= 0) return null;
+  const reduction = Math.max(0, ((inputBytes - outputBytes) / inputBytes) * 100);
+  const formatBytes = (bytes: number) => bytes < 1024 ** 2
+    ? `${(bytes / 1024).toFixed(1)} KB`
+    : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${formatBytes(inputBytes)} -> ${formatBytes(outputBytes)} (${reduction.toFixed(1)}% menos)`;
+};
+
 /** Number of jobs still queued or running (drives the "Actividad" badge). */
 export function useActiveJobCount() {
   return useJobs((state) => state.jobs.filter(isActiveJob).length);
@@ -41,6 +53,7 @@ export function JobList({ onViewDocling }: Props) {
             : null;
         const isActive = isActiveJob(job);
         const isExpanded = expanded === job.task.id;
+        const compressionResult = compressionSummary(job);
 
         return (
           <div key={job.task.id} className="rounded-lg border bg-background/30 p-3">
@@ -80,7 +93,7 @@ export function JobList({ onViewDocling }: Props) {
             <div className="mt-3 flex flex-wrap items-center justify-between gap-1 text-[11px] text-muted-foreground">
               <span>
                 {job.status === "success"
-                  ? "Completado"
+                  ? compressionResult ? `Completado - ${compressionResult}` : "Completado"
                   : job.status === "error"
                     ? "Error"
                     : job.status === "cancelled"

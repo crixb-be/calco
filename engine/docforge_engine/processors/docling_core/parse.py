@@ -226,7 +226,9 @@ class DoclingProcessor(BaseProcessor):
         formulas = bool(options.get("formulas", False))
         mode = str(options.get("tableMode", "fast")).lower()
         tables = mode in ("fast", "accurate")
-        artifacts = self.artifacts_path()
+        custom_artifacts = options.get("artifactsPath")
+        artifacts = Path(os.path.abspath(custom_artifacts)) if custom_artifacts else self.artifacts_path()
+        artifacts.mkdir(parents=True, exist_ok=True)
         # Validate page selections before any slow model work, so bad input fails at once.
         selections = [normalize_page_selection(options.get("pages"), self._page_count(source)) for source in inputs]
 

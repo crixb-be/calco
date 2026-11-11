@@ -117,7 +117,16 @@ export default function ToolPage({
     if (!files.length || !outputDir) return;
 
     const id = crypto.randomUUID();
-    const baseOptions = { ...opts, ...(binaryPath ? { binaryPath } : {}) };
+    const baseOptions = {
+      ...opts,
+      ...(binaryPath ? { binaryPath } : {}),
+      ...(selectedTool.engine === "docling_core" && selectedTool.action === "docling_parse"
+        ? (() => {
+            const artifactsPath = localStorage.getItem("docforge.models");
+            return artifactsPath ? { artifactsPath } : {};
+          })()
+        : {}),
+    };
     const isSelectionSplit = selectedTool.id === "split" && splitMode !== "ranges";
     const task = isPageGridTool && !isSplitRanges
       ? {

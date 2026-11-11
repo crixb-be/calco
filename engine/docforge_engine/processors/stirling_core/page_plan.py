@@ -16,7 +16,7 @@ from typing import Any
 from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.paths import atomic_save, output_path, require_inputs, safe_stem
-from .common import fitz_module
+from .common import fitz_module, open_pdf
 
 OUTPUT_MODES = {"single", "per_page", "per_source"}
 
@@ -92,8 +92,11 @@ def build_sequence(options: dict[str, Any], inputs: list[Path]) -> list[PageRef]
 
 def _page_count(path: Path) -> int:
     fitz = fitz_module()
-    with fitz.open(path) as doc:
+    doc = open_pdf(fitz, path)
+    try:
         return doc.page_count
+    finally:
+        doc.close()
 
 
 class PdfPagePlanProcessor(BaseProcessor):
@@ -117,10 +120,7 @@ class PdfPagePlanProcessor(BaseProcessor):
                 if ref.source_index < 0 or ref.source_index >= len(inputs):
                     raise EngineError("INVALID_TASK", f"sourceIndex fuera de rango: {ref.source_index}")
                 if ref.source_index not in sources:
-                    doc = fitz.open(inputs[ref.source_index])
-                    if doc.needs_pass:
-                        doc.close()
-                        raise EngineError("WRONG_PASSWORD", f"PDF protegido: {inputs[ref.source_index].name}")
+                    doc = open_pdf(fitz, inputs[ref.source_index])
                     sources[ref.source_index] = doc
                 count = sources[ref.source_index].page_count
                 if ref.page_index < 0 or ref.page_index >= count:

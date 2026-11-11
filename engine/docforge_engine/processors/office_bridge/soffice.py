@@ -10,6 +10,7 @@ from ...util.binaries import locate_binary
 from ...util.soffice_runner import DEFAULT_TIMEOUT_SEC, convert_with_soffice, neutral_temp_root
 from ...util.paths import atomic_write_bytes, output_path, require_inputs, safe_stem
 from ..universal.office_converter import SUPPORTED_OFFICE_EXTENSIONS
+from ..stirling_core.common import open_pdf
 
 
 class OfficeProcessor(BaseProcessor):
@@ -112,7 +113,7 @@ class OfficeProcessor(BaseProcessor):
         inputs = require_inputs(task)
         outputs = []
         for source in inputs:
-            doc = pymupdf.open(source)
+            doc = open_pdf(pymupdf, source)
             workbook = Workbook()
             workbook.remove(workbook.active)
             table_count = 0

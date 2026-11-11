@@ -7,12 +7,17 @@ export type JobStatus = "queued" | "running" | "cancelling" | "success" | "error
 export interface Job { task: ProcessorTask; progress: number; status: JobStatus; message: string; logs: { level: string; message: string }[]; outputFiles: string[]; meta?: Record<string, unknown>; }
 interface JobStore { jobs: Job[]; add: (task: ProcessorTask) => Promise<void>; apply: (event: TaskEvent) => void; cancel: (id: string) => Promise<void>; }
 
-const isFinal = (status: JobStatus) => status === "success" || status === "error" || status === "cancelled" || status === "cancelling";
+const isFinal = (status: JobStatus) => status === "success" || status === "error" || status === "cancelled";
 
 function reduce(job: Job, event: TaskEvent): Job {
   if (event.type === "progress") {
     if (isFinal(job.status)) return job;
-    return { ...job, progress: event.percent, message: event.message ?? job.message, status: "running" };
+    return {
+      ...job,
+      progress: event.percent,
+      message: event.message ?? job.message,
+      status: job.status === "cancelling" ? "cancelling" : "running",
+    };
   }
   if (event.type === "log") {
     const logs = [...job.logs, { level: event.level, message: event.message }];

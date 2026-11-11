@@ -114,8 +114,9 @@ class _LRU:
 
 
 class _OpenDoc:
-    def __init__(self, doc):
+    def __init__(self, doc, *, encrypted: bool = False):
         self.doc = doc
+        self.encrypted = encrypted
         self.lock = threading.Lock()
 
 
@@ -153,11 +154,12 @@ class ThumbnailService:
                 doc = fitz.open(str(path))
             except Exception as exc:
                 raise EngineError("INVALID_TASK", f"No se pudo abrir el PDF: {path.name}", str(exc)) from exc
-            if doc.needs_pass:
+            encrypted = bool(doc.needs_pass)
+            if encrypted:
                 if not password or not doc.authenticate(password):
                     doc.close()
                     raise EngineError("WRONG_PASSWORD", f"El PDF está protegido con contraseña: {path.name}")
-            entry = _OpenDoc(doc)
+            entry = _OpenDoc(doc, encrypted=encrypted)
             # Passwords are represented only by a digest in the cache key. A
             # passwordless call therefore cannot reuse an authenticated document.
             self._docs.put(document_key, entry)
@@ -222,11 +224,12 @@ class ThumbnailService:
         variant = f"{tier}_{max_width}_{dpi}"  # cache key: hash / tier_width_dpi / index
         key = (cache_digest, variant, index, fmt)
         cached = self._images.get(key)
-        if cached is None:
+        if cached is None and not entry.encrypted:
             cached = self._from_disk(cache_digest, variant, index, fmt)
         if cached is None:
             cached = self._render(entry, index, zoom, fmt)
-            self._to_disk(cache_digest, variant, index, fmt, cached)
+            if not entry.encrypted:
+                self._to_disk(cache_digest, variant, index, fmt, cached)
         self._images.put(key, cached)
         data, width, height, real_fmt = cached
         url = f"data:{_MIME[real_fmt]};base64,{base64.b64encode(data).decode('ascii')}"

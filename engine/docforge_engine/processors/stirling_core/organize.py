@@ -6,7 +6,7 @@ from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.pages import page_ranges
 from ...util.paths import atomic_save, output_path, require_inputs, safe_stem
-from .common import fitz_module, one_input
+from .common import fitz_module, one_input, open_pdf
 
 
 class PdfOrganizeProcessor(BaseProcessor):
@@ -35,7 +35,7 @@ class PdfOrganizeProcessor(BaseProcessor):
         try:
             for number, path in enumerate(inputs):
                 reporter.check_cancelled()
-                source = fitz.open(path)
+                source = open_pdf(fitz, path)
                 try:
                     result.insert_pdf(source)
                 finally:
@@ -44,13 +44,15 @@ class PdfOrganizeProcessor(BaseProcessor):
             atomic_save(out, lambda temp: result.save(temp, garbage=4, deflate=True))
         finally:
             result.close()
-        return [str(out)], {"pages": len(fitz.open(out))}
+        with fitz.open(out) as document:
+            pages = len(document)
+        return [str(out)], {"pages": pages}
 
     @action()
     def split(self, task, reporter):
         fitz = fitz_module()
         source_path = one_input(task)
-        source = fitz.open(source_path)
+        source = open_pdf(fitz, source_path)
         try:
             mode = task.options.get("mode", "ranges")
             if mode == "every":
@@ -94,7 +96,7 @@ class PdfOrganizeProcessor(BaseProcessor):
     def rotate(self, task, reporter):
         fitz = fitz_module()
         source_path = one_input(task)
-        doc = fitz.open(source_path)
+        doc = open_pdf(fitz, source_path)
         try:
             angle = int(task.options.get("angle", 90))
             if angle not in (90, 180, 270):
@@ -114,7 +116,7 @@ class PdfOrganizeProcessor(BaseProcessor):
     def delete_pages(self, task, reporter):
         fitz = fitz_module()
         source_path = one_input(task)
-        doc = fitz.open(source_path)
+        doc = open_pdf(fitz, source_path)
         try:
             indexes = page_ranges(task.options.get("pages"), len(doc))
             if len(indexes) == len(doc):
@@ -132,7 +134,7 @@ class PdfOrganizeProcessor(BaseProcessor):
     def crop(self, task, reporter):
         fitz = fitz_module()
         source_path = one_input(task)
-        doc = fitz.open(source_path)
+        doc = open_pdf(fitz, source_path)
         try:
             box = _parse_box(task.options.get("box"))
             margins = _parse_margins(task.options.get("margins"))
@@ -158,7 +160,8 @@ class PdfOrganizeProcessor(BaseProcessor):
     def nup(self, task, reporter):
         fitz = fitz_module()
         source_path = one_input(task)
-        source = fitz.open(source_path)
+        source = open_pdf(fitz, source_path)
+        out_doc = None
         try:
             per_sheet = int(task.options.get("perSheet", 2))
             layouts = {2: (1, 2), 4: (2, 2), 6: (2, 3), 9: (3, 3)}
@@ -182,9 +185,10 @@ class PdfOrganizeProcessor(BaseProcessor):
                 reporter.report(min(100, (min(start + per_sheet, len(source)) / len(source)) * 100), f"Composed sheet {start // per_sheet + 1}")
             out = output_path(task, safe_stem(source_path), "nup", ".pdf")
             atomic_save(out, lambda temp: out_doc.save(temp, garbage=4, deflate=True))
-            out_doc.close()
             return [str(out)], {"sheets": (len(source) + per_sheet - 1) // per_sheet}
         finally:
+            if out_doc is not None:
+                out_doc.close()
             source.close()
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.paths import atomic_save, output_path, safe_stem
-from .common import one_input, pymupdf_module
+from .common import one_input, open_pdf, pymupdf_module
 
 
 class PdfCompressionProcessor(BaseProcessor):
@@ -22,7 +22,7 @@ class PdfCompressionProcessor(BaseProcessor):
         if not 1 <= quality <= 100:
             raise EngineError("INVALID_TASK", "compress_pdf.quality must be between 1 and 100")
         output = output_path(task, safe_stem(source), "compress_pdf", ".pdf")
-        document = pymupdf.open(str(source))
+        document = open_pdf(pymupdf, source)
         try:
             # Re-encode eligible embedded images before the final garbage/stream pass.
             document.rewrite_images(

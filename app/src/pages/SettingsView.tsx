@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, FolderOpen, HardDrive, Moon, RefreshCw, Sun, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, FolderOpen, HardDrive, Moon, RefreshCw, Sun, Trash2, XCircle, Zap } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Badge, Button, Card } from "@/components/ui/primitives";
+import { Badge, Button, Card, Input, Label } from "@/components/ui/primitives";
 import { engineRpc, checkSystemHealth, getDefaultOutputDir, setDefaultOutputDir, type SystemHealth } from "@/lib/engine";
+import type { ProcessorTask } from "@/contracts/task";
+import { useJobs } from "@/store/jobs";
 
 type Props = { theme: "dark" | "light"; onToggleTheme: () => void };
 
@@ -15,7 +17,11 @@ const formatBytes = (bytes: number | null) => {
 export default function SettingsView({ theme, onToggleTheme }: Props) {
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [outputDir, setOutputDir] = useState("");
+  const [soffice, setSoffice] = useState(() => localStorage.getItem("docforge.soffice") ?? "");
+  const [ffmpeg, setFfmpeg] = useState(() => localStorage.getItem("docforge.ffmpeg") ?? "");
+  const [models, setModels] = useState(() => localStorage.getItem("docforge.models") ?? "");
   const [message, setMessage] = useState("");
+  const add = useJobs((state) => state.add);
 
   const refresh = async () => {
     try {
@@ -49,6 +55,37 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
     }
   };
 
+  const saveLocalPaths = () => {
+    localStorage.setItem("docforge.soffice", soffice.trim());
+    localStorage.setItem("docforge.ffmpeg", ffmpeg.trim());
+    localStorage.setItem("docforge.models", models.trim());
+    setMessage("Rutas locales guardadas.");
+  };
+
+  const chooseModelsDir = async () => {
+    const selected = await open({ directory: true, multiple: false, title: "Carpeta de modelos Docling" });
+    if (typeof selected === "string") {
+      setModels(selected);
+      localStorage.setItem("docforge.models", selected);
+    }
+  };
+
+  const prefetchModels = async () => {
+    const folder = models.trim();
+    if (!folder) return;
+    localStorage.setItem("docforge.models", folder);
+    const task: ProcessorTask = {
+      id: crypto.randomUUID(),
+      engine: "docling_core",
+      action: "prefetch_models",
+      inputFiles: [],
+      outputDir: folder,
+      options: { artifactsPath: folder },
+    };
+    await add(task);
+    setMessage("Prefetch de modelos enviado a la cola.");
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-6 lg:p-8">
       <div className="flex items-center justify-between gap-3">
@@ -73,6 +110,23 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
       </div>
 
       <Card className="flex items-center justify-between gap-4 p-4"><div><h2 className="font-semibold">Datos locales</h2><p className="mt-1 text-xs text-muted-foreground">Elimina historial y residuos temporales del motor.</p></div><Button variant="danger" onClick={() => void clearLocalData()}><Trash2 size={15} /> Limpiar historial y caché</Button></Card>
+      <Card className="space-y-4 p-4">
+        <div>
+          <h2 className="font-semibold">Dependencias y modelos</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Estas rutas se guardan en este equipo y se envian al motor cuando corresponde.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div><Label htmlFor="settings-soffice">Ruta de LibreOffice (soffice)</Label><Input id="settings-soffice" value={soffice} onChange={(event) => setSoffice(event.target.value)} placeholder="Detectar automaticamente" /></div>
+          <div><Label htmlFor="settings-ffmpeg">Ruta de FFmpeg</Label><Input id="settings-ffmpeg" value={ffmpeg} onChange={(event) => setFfmpeg(event.target.value)} placeholder="Detectar automaticamente" /></div>
+          <div className="md:col-span-2"><Label htmlFor="settings-models">Carpeta de modelos Docling</Label><div className="mt-1 flex gap-2"><Input id="settings-models" value={models} onChange={(event) => setModels(event.target.value)} placeholder="Selecciona una carpeta para los modelos" /><Button variant="outline" className="h-10 w-10 shrink-0 px-0" onClick={() => void chooseModelsDir()}><FolderOpen size={16} /></Button></div></div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={saveLocalPaths}><Zap size={15} /> Guardar rutas</Button>
+          <Button variant="outline" disabled={!models.trim()} onClick={() => void prefetchModels()}><Zap size={15} /> Prefetch models</Button>
+          <Badge>Accion: docling_core / prefetch_models</Badge>
+        </div>
+      </Card>
+
       {message && <Badge className="max-w-full truncate">{message}</Badge>}
     </div>
   );

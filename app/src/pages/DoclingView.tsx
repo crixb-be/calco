@@ -59,13 +59,20 @@ export default function DoclingView({ onBack, initialPreview }: Props) {
   async function run() {
     if (!canRun) return;
     const id = crypto.randomUUID();
+    const artifactsPath = localStorage.getItem("docforge.models");
     await add({
       id,
       engine: "docling_core",
       action: "docling_parse",
       inputFiles: files,
       outputDir,
-      options: { exportFormats: [format], ocr: true, tableMode: "fast", formulas: true },
+      options: {
+        exportFormats: [format],
+        ocr: true,
+        tableMode: "fast",
+        formulas: true,
+        ...(artifactsPath ? { artifactsPath } : {}),
+      },
     });
     setRunningId(id);
     showToast("success", `Parser Docling enviado: ${outputLabel[format]}.`);

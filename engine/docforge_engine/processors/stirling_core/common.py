@@ -14,6 +14,18 @@ def pymupdf_module():
         raise EngineError("DEPENDENCY_MISSING", "PyMuPDF is required for PDF actions", str(exc)) from exc
 
 
+def open_pdf(pymupdf, path: Path):
+    """Open an unencrypted PDF and normalize PyMuPDF failures for task callers."""
+    try:
+        document = pymupdf.open(str(path))
+    except Exception as exc:
+        raise EngineError("CONVERSION_FAILED", f"No se pudo abrir el PDF: {path.name}", str(exc)) from exc
+    if document.needs_pass:
+        document.close()
+        raise EngineError("WRONG_PASSWORD", f"El PDF estÃ¡ protegido con contraseÃ±a: {path.name}")
+    return document
+
+
 # Backwards-compatible name for existing processors. It returns pymupdf and does not
 # import the deprecated ``fitz`` package name.
 fitz_module = pymupdf_module

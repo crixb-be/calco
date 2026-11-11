@@ -7,21 +7,25 @@ import sys
 import threading
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 from .contract import parse_task
 from .core.cleanup import shutdown_cleanup, startup_cleanup
 from .errors import EngineError
 from .registry import EngineRegistry
-from .storage.history_manager import HistoryManager
+from .storage.history_manager import get_history_manager
+
+
+MAX_FRAME_BYTES = 16 * 1024 * 1024
+MAX_PENDING_RPCS = 64
 
 
 class Sidecar:
     def __init__(self):
         startup_cleanup()
         self.registry = EngineRegistry()
-        self.history = HistoryManager()
+        self.history = get_history_manager()
         # Private handle for the NDJSON channel; serve() points sys.stdout at stderr so stray
         # print() calls from third-party libraries cannot corrupt protocol lines.
         self._out = sys.stdout
@@ -34,6 +38,10 @@ class Sidecar:
         self.docling_active = 0
         # RPC queries (thumbnails, file reads) never wait behind long-running tasks.
         self.rpc_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="docforge-rpc")
+        self.rpc_lock = threading.Lock()
+        self.pending_rpcs: dict[str, Future | None] = {}
+        self.running_rpcs: set[str] = set()
+        self.cancelled_rpcs: set[str] = set()
         threading.Thread(target=self._cleanup_thumbnail_cache, daemon=True).start()
 
     @staticmethod
@@ -47,18 +55,88 @@ class Sidecar:
         except Exception as exc:  # best effort
             print(f"[engine] limpieza de caché falló: {exc}", file=sys.stderr, flush=True)
 
+    def _rpc_result(self, rpc_id: str, event: dict):
+        with self.rpc_lock:
+            if rpc_id in self.cancelled_rpcs:
+                return
+        self.emit(event)
+
     def _rpc(self, rpc_id: str, method: str, params):
         from . import rpc
 
+        with self.rpc_lock:
+            self.running_rpcs.add(rpc_id)
         try:
             result = rpc.dispatch(method, params)
-            self.emit({"type": "rpc_result", "rpcId": rpc_id, "ok": True, "result": result})
+            self._rpc_result(rpc_id, {"type": "rpc_result", "rpcId": rpc_id, "ok": True, "result": result})
         except EngineError as exc:
-            self.emit({"type": "rpc_result", "rpcId": rpc_id, "ok": False,
-                       "error": {"code": exc.code, "message": exc.message, "details": exc.details}})
+            self._rpc_result(rpc_id, {"type": "rpc_result", "rpcId": rpc_id, "ok": False,
+                                      "error": {"code": exc.code, "message": exc.message, "details": exc.details}})
         except Exception as exc:  # never let one query kill the sidecar
+            self._rpc_result(rpc_id, {"type": "rpc_result", "rpcId": rpc_id, "ok": False,
+                                      "error": {"code": "INTERNAL", "message": str(exc), "details": type(exc).__name__}})
+
+    def _rpc_finished(self, rpc_id: str, future: Future) -> None:
+        del future
+        with self.rpc_lock:
+            self.pending_rpcs.pop(rpc_id, None)
+            self.running_rpcs.discard(rpc_id)
+            self.cancelled_rpcs.discard(rpc_id)
+
+    def submit_rpc(self, rpc_id: str, method: str, params) -> None:
+        with self.rpc_lock:
+            if len(self.pending_rpcs) >= MAX_PENDING_RPCS or rpc_id in self.pending_rpcs:
+                busy = True
+            else:
+                busy = False
+                # Reserve the slot before submitting so a concurrent cancel cannot miss it.
+                self.pending_rpcs[rpc_id] = None
+        if busy:
             self.emit({"type": "rpc_result", "rpcId": rpc_id, "ok": False,
-                       "error": {"code": "INTERNAL", "message": str(exc), "details": type(exc).__name__}})
+                       "error": {"code": "BUSY", "message": "Too many pending RPCs"}})
+            return
+        future = self.rpc_pool.submit(self._rpc, rpc_id, method, params)
+        with self.rpc_lock:
+            missing = rpc_id not in self.pending_rpcs
+            if not missing:
+                self.pending_rpcs[rpc_id] = future
+        if missing:
+            future.cancel()
+            future.add_done_callback(lambda completed, id_=rpc_id: self._rpc_finished(id_, completed))
+            return
+        future.add_done_callback(lambda completed, id_=rpc_id: self._rpc_finished(id_, completed))
+
+    def cancel_rpc(self, rpc_id: str) -> None:
+        with self.rpc_lock:
+            future = self.pending_rpcs.get(rpc_id)
+            if future is None:
+                if rpc_id not in self.pending_rpcs:
+                    return
+                if rpc_id in self.running_rpcs:
+                    self.cancelled_rpcs.add(rpc_id)
+                    queued = False
+                else:
+                    self.pending_rpcs.pop(rpc_id, None)
+                    self.cancelled_rpcs.add(rpc_id)
+                    queued = True
+            else:
+                queued = False
+
+        # Future.cancel() may invoke its done callback synchronously. Never call it while
+        # holding rpc_lock, or the callback would wait forever for the same lock.
+        if future is not None and future.cancel():
+            with self.rpc_lock:
+                self.pending_rpcs.pop(rpc_id, None)
+            queued = True
+        elif future is not None:
+            # A running RPC cannot be interrupted safely; suppress its eventual result.
+            with self.rpc_lock:
+                if rpc_id in self.pending_rpcs:
+                    self.cancelled_rpcs.add(rpc_id)
+            queued = False
+        if queued:
+            self.emit({"type": "rpc_result", "rpcId": rpc_id, "ok": False,
+                       "error": {"code": "CANCELLED", "message": "RPC cancelled"}})
 
     def emit(self, event: dict):
         # ensure_ascii=True: the NDJSON channel is pure ASCII (non-ASCII -> \uXXXX), so paths like
@@ -136,6 +214,9 @@ class Sidecar:
               file=sys.stderr, flush=True)
         sys.stdout = sys.stderr
         for line in _detach_stdin():
+            if len(line) > MAX_FRAME_BYTES:
+                self.emit({"type": "error", "id": "", "code": "INVALID_TASK", "message": "Frame too large"})
+                continue
             line = line.strip()
             if not line:
                 continue
@@ -151,7 +232,10 @@ class Sidecar:
                 self.cancel(str(raw.get("id", "")))
                 continue
             if isinstance(raw, dict) and raw.get("type") == "rpc":
-                self.rpc_pool.submit(self._rpc, str(raw.get("rpcId", "")), str(raw.get("method", "")), raw.get("params"))
+                self.submit_rpc(str(raw.get("rpcId", "")), str(raw.get("method", "")), raw.get("params"))
+                continue
+            if isinstance(raw, dict) and raw.get("type") == "rpc_cancel":
+                self.cancel_rpc(str(raw.get("rpcId", "")))
                 continue
             task_id = str(raw.get("id", "")) if isinstance(raw, dict) else ""
             try:
