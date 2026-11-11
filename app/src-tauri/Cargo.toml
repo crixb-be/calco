@@ -1,6 +1,6 @@
 [package]
 name = "docforge-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "DocForge Desktop"
 authors = ["DocForge"]
 edition = "2021"

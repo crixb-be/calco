@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   BrainCircuit,
   ChevronRight,
+  Code2,
   Clapperboard,
   FileStack,
   Files,
@@ -24,6 +25,8 @@ import SecurityView from "@/pages/SecurityView";
 import PageOrganizerView from "@/pages/PageOrganizerView";
 import HistoryView from "@/pages/HistoryView";
 import PdfEditorView from "@/pages/PdfEditorView";
+import DeveloperView from "@/pages/DeveloperView";
+import { useAppVersion } from "@/lib/appVersion";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { useActiveJobCount } from "@/components/JobQueue";
 import { Toaster } from "@/components/ui/toast";
@@ -32,7 +35,7 @@ import { listenToTaskEvents } from "@/lib/engine";
 import { useJobs } from "@/store/jobs";
 import { useOutputDirs } from "@/store/outputDirs";
 
-type Page = "home" | "tool" | "settings" | "converter" | "history" | "pdf_editor";
+type Page = "home" | "tool" | "settings" | "converter" | "history" | "pdf_editor" | "developer";
 
 /** Domains that open a dedicated full-width workspace instead of the filtered catalog. */
 const DOMAIN_ICONS: Record<Domain, LucideIcon> = {
@@ -54,6 +57,7 @@ export default function App() {
   const [viewerRequest, setViewerRequest] = useState<DoclingViewerRequest | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
   const activeJobs = useActiveJobCount();
+  const appVersion = useAppVersion();
   const apply = useJobs((state) => state.apply);
   const loadOutputDirs = useOutputDirs((state) => state.load);
 
@@ -184,6 +188,17 @@ export default function App() {
           </button>
           <button
             type="button"
+            onClick={() => {
+              setActivityOpen(false);
+              setPage("developer");
+              setDomain(undefined);
+            }}
+            className={navClass(page === "developer")}
+          >
+            <span className={navIcon(page === "developer")}><Code2 size={16} /></span> Desarrollador
+          </button>
+          <button
+            type="button"
             title="Cambiar tema"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className={navClass(false)}
@@ -191,6 +206,7 @@ export default function App() {
             <span className={navIcon(false)}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}</span>
             {theme === "dark" ? "Tema claro" : "Tema oscuro"}
           </button>
+          {appVersion && <p className="px-3 pt-1 text-[10px] text-muted-foreground">DocForge Desktop v{appVersion}</p>}
         </div>
       </aside>
 
@@ -223,6 +239,7 @@ export default function App() {
         )}
         {page === "history" && <HistoryView onBack={() => goHome()} />}
         {page === "pdf_editor" && <PdfEditorView />}
+        {page === "developer" && <DeveloperView />}
       </main>
 
       <ActivityDrawer open={activityOpen} onClose={() => setActivityOpen(false)} onViewDocling={openDoclingResult} onOpenHistory={openHistory} />
