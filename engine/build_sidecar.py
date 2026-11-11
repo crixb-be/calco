@@ -80,8 +80,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.lite:
         command += [
             "--exclude-module", "docling", "--exclude-module", "docling_core",
-            "--exclude-module", "torch", "--exclude-module", "torchvision", "--exclude-module", "numpy",
+            "--exclude-module", "torch", "--exclude-module", "torchvision", "--exclude-module", "rapidocr",
+            "--exclude-module", "pymupdf.layout", "--exclude-module", "onnxruntime",
+            "--exclude-module", "cv2", "--exclude-module", "scipy",
         ]
+        # numpy stays bundled even in lite builds: pymupdf4llm (PDF -> Markdown) imports it.
+        command += ["--hidden-import", "numpy"]
     if args.upx:
         command += ["--upx-exclude", "vcruntime140.dll", "--upx-exclude", "python3*.dll"]
         if args.upx_dir:

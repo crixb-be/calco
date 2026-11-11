@@ -40,3 +40,12 @@ def test_pdf_to_markdown(tmp_path):
         document.save(source)
     outputs, _ = run_markdown(source, tmp_path)
     assert "Tiny PDF" in Path(outputs[0]).read_text(encoding="utf-8")
+
+
+def test_markdown_output_uses_plain_name(tmp_path):
+    source = tmp_path / "informe.txt"
+    source.write_text("hola", encoding="utf-8")
+    first, _ = run_markdown(source, tmp_path / "out")
+    second, _ = run_markdown(source, tmp_path / "out")
+    assert Path(first[0]).name == "informe.md"
+    assert Path(second[0]).name == "informe_2.md"

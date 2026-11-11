@@ -372,7 +372,11 @@ class DoclingProcessor(BaseProcessor):
                 except ImportError as exc:
                     raise EngineError("DEPENDENCY_MISSING", "pymupdf4llm es necesario para convertir PDF a Markdown", str(exc)) from exc
                 reporter.log(f"Markdown mediante pymupdf4llm: {source.name}")
-                content = str(pymupdf4llm.to_markdown(str(source)))
+                # Classic (non-ONNX) mode, OCR off: the lite sidecar bundles neither the
+                # pymupdf.layout models (onnxruntime/OpenCV/SciPy) nor RapidOCR. It still
+                # emits headings and GFM tables.
+                pymupdf4llm.use_layout(False)
+                content = str(pymupdf4llm.to_markdown(str(source), use_ocr=False))
             else:
                 content = self._docling_markdown(source)
                 if content is not None:
@@ -388,7 +392,7 @@ class DoclingProcessor(BaseProcessor):
                         reporter.check_cancelled()
                         content = str(pymupdf4llm.to_markdown(str(pdf)))
             reporter.check_cancelled()
-            out = output_path(task, safe_stem(source), "to_markdown", ".md", index if total > 1 else None).resolve()
+            out = output_path(task, safe_stem(source), "", ".md", index if total > 1 else None).resolve()
             atomic_write_bytes(out, content.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8"))
             outputs.append(str(out))
             reporter.report((index + 1) * 100 / total, f"Convertido {source.name}")

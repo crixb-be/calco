@@ -22,7 +22,7 @@ def open_pdf(pymupdf, path: Path):
         raise EngineError("CONVERSION_FAILED", f"No se pudo abrir el PDF: {path.name}", str(exc)) from exc
     if document.needs_pass:
         document.close()
-        raise EngineError("WRONG_PASSWORD", f"El PDF estÃ¡ protegido con contraseÃ±a: {path.name}")
+        raise EngineError("WRONG_PASSWORD", f"El PDF está protegido con contraseña: {path.name}")
     return document
 
 

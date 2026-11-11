@@ -64,7 +64,11 @@ class PdfEditProcessor(BaseProcessor):
                         "size": _annotation_number(annotation.get("size"), "size"),
                         "color": _annotation_color(annotation.get("color")),
                         "text": annotation["text"],
+                        "font": annotation.get("font", "helv"),
+                        "bold": annotation.get("bold", False),
                     }
+                    if item["font"] not in {"helv", "tiro", "cour"} or not isinstance(item["bold"], bool):
+                        raise EngineError("INVALID_TASK", "font o bold inválido")
                     if item["size"] <= 0:
                         raise EngineError("INVALID_TASK", "size debe ser mayor que cero")
                 elif kind == "ink":
@@ -93,6 +97,32 @@ class PdfEditProcessor(BaseProcessor):
                         "h": height,
                         "color": _annotation_color(annotation.get("color")),
                     }
+                elif kind == "rect":
+                    width = _annotation_number(annotation.get("w"), "w")
+                    height = _annotation_number(annotation.get("h"), "h")
+                    stroke_width = _annotation_number(annotation.get("width"), "width")
+                    if width < 0 or height < 0 or stroke_width <= 0:
+                        raise EngineError("INVALID_TASK", "Rectángulo inválido")
+                    item = {"kind": kind, "x": _annotation_number(annotation.get("x"), "x"), "y": _annotation_number(annotation.get("y"), "y"), "w": width, "h": height, "width": stroke_width, "color": _annotation_color(annotation.get("color"))}
+                elif kind == "line":
+                    stroke_width = _annotation_number(annotation.get("width"), "width")
+                    if stroke_width <= 0:
+                        raise EngineError("INVALID_TASK", "width debe ser mayor que cero")
+                    item = {"kind": kind, "x1": _annotation_number(annotation.get("x1"), "x1"), "y1": _annotation_number(annotation.get("y1"), "y1"), "x2": _annotation_number(annotation.get("x2"), "x2"), "y2": _annotation_number(annotation.get("y2"), "y2"), "width": stroke_width, "color": _annotation_color(annotation.get("color"))}
+                elif kind == "image":
+                    raw_path = annotation.get("path")
+                    if not isinstance(raw_path, str) or not Path(raw_path).is_absolute():
+                        raise EngineError("INVALID_TASK", "La ruta de imagen debe ser absoluta")
+                    image_path = Path(raw_path)
+                    if not image_path.is_file() or image_path.suffix.lower() not in {".png", ".jpg", ".jpeg"}:
+                        raise EngineError("INVALID_TASK", "Imagen no encontrada o extensión inválida")
+                    if image_path.stat().st_size > 20 * 1024 * 1024:
+                        raise EngineError("INVALID_TASK", "La imagen supera el límite de 20 MB")
+                    width = _annotation_number(annotation.get("w"), "w")
+                    height = _annotation_number(annotation.get("h"), "h")
+                    if width <= 0 or height <= 0:
+                        raise EngineError("INVALID_TASK", "La imagen debe tener tamaño positivo")
+                    item = {"kind": kind, "x": _annotation_number(annotation.get("x"), "x"), "y": _annotation_number(annotation.get("y"), "y"), "w": width, "h": height, "path": str(image_path)}
                 else:
                     raise EngineError("INVALID_TASK", f"Tipo de anotación no soportado: {kind}")
                 per_page[page_number].append(item)
@@ -102,28 +132,39 @@ class PdfEditProcessor(BaseProcessor):
                 # PyMuPDF's derotation matrix maps them back to the page's PDF coordinates.
                 return fitz.Point(x, y) * page.derotation_matrix
 
+            def display_rect(page, annotation):
+                corners = [
+                    display_point(page, annotation["x"], annotation["y"]),
+                    display_point(page, annotation["x"] + annotation["w"], annotation["y"]),
+                    display_point(page, annotation["x"] + annotation["w"], annotation["y"] + annotation["h"]),
+                    display_point(page, annotation["x"], annotation["y"] + annotation["h"]),
+                ]
+                return fitz.Rect(min(point.x for point in corners), min(point.y for point in corners), max(point.x for point in corners), max(point.y for point in corners))
+
             for number, page in enumerate(doc):
                 reporter.check_cancelled()
                 for annotation in per_page[number]:
-                    color = annotation["color"]
+                    color = annotation.get("color")
                     if annotation["kind"] == "text":
                         size = annotation["size"]
                         for line_number, line in enumerate(annotation["text"].split("\n")):
-                            # Helvetica is intentionally used here; non-Latin text needs an embedded font.
-                            point = display_point(page, annotation["x"], annotation["y"] + size + line_number * size * 1.2)
-                            page.insert_text(point, line, fontsize=size, color=color, fontname="helv", overlay=True)
+                            # The UI positions a div at y with CSS line-height 1.2; PyMuPDF needs its baseline.
+                            point = display_point(page, annotation["x"], annotation["y"] + size * (line_number * 1.2 + 0.8))
+                            font = {"helv": "hebo", "tiro": "tibo", "cour": "cobo"}[annotation["font"]] if annotation["bold"] else annotation["font"]
+                            page.insert_text(point, line, fontsize=size, color=color, fontname=font, overlay=True)
                     elif annotation["kind"] == "ink":
                         points = [display_point(page, x, y) for x, y in annotation["points"]]
                         page.draw_polyline(points, color=color, width=annotation["width"], lineCap=1, lineJoin=1, closePath=False, overlay=True)
-                    else:
-                        corners = [
-                            display_point(page, annotation["x"], annotation["y"]),
-                            display_point(page, annotation["x"] + annotation["w"], annotation["y"]),
-                            display_point(page, annotation["x"] + annotation["w"], annotation["y"] + annotation["h"]),
-                            display_point(page, annotation["x"], annotation["y"] + annotation["h"]),
-                        ]
-                        rect = fitz.Rect(min(point.x for point in corners), min(point.y for point in corners), max(point.x for point in corners), max(point.y for point in corners))
-                        page.draw_rect(rect, color=None, fill=color, fill_opacity=0.35, overlay=True)
+                    elif annotation["kind"] == "highlight":
+                        page.draw_rect(display_rect(page, annotation), color=None, fill=color, fill_opacity=0.35, overlay=True)
+                    elif annotation["kind"] == "rect":
+                        page.draw_rect(display_rect(page, annotation), color=color, width=annotation["width"], overlay=True)
+                    elif annotation["kind"] == "line":
+                        start = display_point(page, annotation["x1"], annotation["y1"])
+                        end = display_point(page, annotation["x2"], annotation["y2"])
+                        page.draw_line(start, end, color=color, width=annotation["width"], lineCap=1, overlay=True)
+                    elif annotation["kind"] == "image":
+                        page.insert_image(display_rect(page, annotation), filename=annotation["path"], keep_proportion=False, overlay=True, rotate=int(page.rotation) % 360)
                 reporter.report((number + 1) * 100 / len(doc), f"Editada página {number + 1}")
             out = output_path(task, safe_stem(source), "editado", ".pdf")
             atomic_save(out, lambda temp: doc.save(temp, garbage=3, deflate=True))

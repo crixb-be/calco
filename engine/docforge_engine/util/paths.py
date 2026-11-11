@@ -76,7 +76,8 @@ def output_path(task, stem: str, action: str, extension: str, index: int | None 
             candidate_name += extension if extension.startswith(".") else f".{extension}"
     else:
         suffix = extension if extension.startswith(".") else f".{extension}"
-        candidate_name = f"{safe_stem(Path(stem))}_{action}"
+        # An empty action keeps the plain stem (e.g. "informe.md").
+        candidate_name = f"{safe_stem(Path(stem))}_{action}" if action else safe_stem(Path(stem))
         if index is not None:
             candidate_name += f"_{index + 1}"
         candidate_name += suffix

@@ -73,6 +73,21 @@ def read_pdf_bytes(params: dict[str, Any]) -> dict[str, Any]:
     return {"data": base64.b64encode(pdf.read_bytes()).decode("ascii"), "size": size}
 
 
+@rpc_method("read_file_bytes")
+def read_file_bytes(params: dict[str, Any]) -> dict[str, Any]:
+    path = _abs_path(params, "path")
+    extension = path.suffix.lower()
+    limits = {".pdf": MAX_PDF_BYTES, ".png": DEFAULT_MAX_BYTES, ".jpg": DEFAULT_MAX_BYTES, ".jpeg": DEFAULT_MAX_BYTES}
+    if extension not in limits:
+        raise EngineError("INVALID_TASK", "Solo se permiten archivos PDF, PNG o JPG")
+    size = path.stat().st_size
+    if size > limits[extension]:
+        limit_mb = limits[extension] // (1024 * 1024)
+        raise EngineError("INVALID_TASK", f"El archivo supera el límite de {limit_mb} MB ({size} bytes)")
+    mime = "application/pdf" if extension == ".pdf" else "image/png" if extension == ".png" else "image/jpeg"
+    return {"data": base64.b64encode(path.read_bytes()).decode("ascii"), "size": size, "mime": mime}
+
+
 @rpc_method("get_page_thumbnails")
 def get_page_thumbnails(params: dict[str, Any]) -> dict[str, Any]:
     pdf = _abs_path(params, "pdfPath")
@@ -160,9 +175,9 @@ def export_file(params: dict[str, Any]) -> dict[str, Any]:
     target = _abs_path(params, "targetPath", must_exist=False)
     source_ext = source.suffix.lower()
     if source_ext not in EXPORT_EXTENSIONS:
-        raise EngineError("INVALID_TASK", f"ExtensiÃ³n no permitida para exportaciÃ³n: {source.suffix or '(sin extensiÃ³n)'}")
+        raise EngineError("INVALID_TASK", f"Extensión no permitida para exportación: {source.suffix or '(sin extensión)'}")
     if target.suffix.lower() != source_ext:
-        raise EngineError("INVALID_TASK", "La extensiÃ³n de destino debe coincidir con la de origen")
+        raise EngineError("INVALID_TASK", "La extensión de destino debe coincidir con la de origen")
     forbidden = [
         Path(os.environ.get("WINDIR", os.environ.get("SystemRoot", r"C:\\Windows"))),
         Path(os.environ.get("ProgramFiles", r"C:\\Program Files")),
@@ -171,7 +186,7 @@ def export_file(params: dict[str, Any]) -> dict[str, Any]:
     ]
     target_resolved = target.resolve()
     if any(target_resolved == root.resolve() or root.resolve() in target_resolved.parents for root in forbidden):
-        raise EngineError("INVALID_TASK", "Destino de exportaciÃ³n no permitido")
+        raise EngineError("INVALID_TASK", "Destino de exportación no permitido")
     if os.path.normcase(str(source)) == os.path.normcase(str(target)):
         return {"path": str(target)}
     target.parent.mkdir(parents=True, exist_ok=True)
