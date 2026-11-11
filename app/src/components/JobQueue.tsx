@@ -89,6 +89,11 @@ export function JobList({ onViewDocling }: Props) {
               {isActive && <LoaderCircle size={12} className="shrink-0 animate-spin" />}
               <span className={`break-words ${job.status === "error" ? "whitespace-pre-wrap" : "line-clamp-2"}`}>{job.message}</span>
             </p>
+            {job.status === "error" && job.details && (
+              <p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-red-400/20 bg-red-400/5 px-2 py-1.5 text-[11px] text-red-200">
+                {job.details}
+              </p>
+            )}
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-1 text-[11px] text-muted-foreground">
               <span>

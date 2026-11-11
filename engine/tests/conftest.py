@@ -7,6 +7,15 @@ import pytest
 from PIL import Image, ImageDraw
 
 
+@pytest.fixture(autouse=True)
+def _no_real_office_com(monkeypatch):
+    """Never drive a real Word/Excel/PowerPoint from tests (also inherited by `serve` subprocesses).
+
+    Cascade tests monkeypatch ``com_available`` explicitly, which overrides this.
+    """
+    monkeypatch.setenv("DOCFORGE_DISABLE_OFFICE_COM", "1")
+
+
 @pytest.fixture()
 def fixture_dir(tmp_path: Path):
     image_path = tmp_path / "fixture.png"

@@ -6,4 +6,11 @@ export type TaskEvent =
   | { type: "log"; id: string; level: "info" | "warn" | "error"; message: string }
   | { type: "result"; id: string; status: "success"; outputFiles: string[]; meta?: Record<string, unknown> }
   | { type: "error"; id: string; code: ErrorCode; message: string; details?: string };
-export interface EngineHealth { engines: Record<string, { available: boolean; version?: string; reason?: string }>; }
+export interface EngineHealth {
+  engines: Record<string, {
+    available: boolean;
+    binary?: string | null;
+    reason?: string | null;
+    engines?: Record<string, boolean | string | null>;
+  }>;
+}

@@ -7,9 +7,10 @@ from pathlib import Path
 from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.binaries import locate_binary
-from ...util.soffice_runner import DEFAULT_TIMEOUT_SEC, convert_with_soffice, neutral_temp_root
+from ...util.office_com import com_available, office_kind_for_extension
+from ...util.office_engines import NO_ENGINE_DETAILS, convert_office_to_pdf
 from ...util.paths import atomic_write_bytes, output_path, require_inputs, safe_stem
-from ..universal.office_converter import SUPPORTED_OFFICE_EXTENSIONS
+from ...util.soffice_runner import DEFAULT_TIMEOUT_SEC, convert_with_soffice, neutral_temp_root
 from ..stirling_core.common import open_pdf
 
 
@@ -18,7 +19,19 @@ class OfficeProcessor(BaseProcessor):
 
     def health(self):
         binary = locate_binary("soffice", {})
-        return {"available": binary is not None, "binary": binary, "reason": None if binary else "LibreOffice not found"}
+        engines = {
+            "msword": com_available("msword"),
+            "msexcel": com_available("msexcel"),
+            "mspowerpoint": com_available("mspowerpoint"),
+            "libreoffice": binary,
+        }
+        available = any(bool(value) for value in engines.values())
+        return {
+            "available": available,
+            "binary": binary,  # compatibility with existing consumers
+            "engines": engines,
+            "reason": None if available else "No hay ninguna suite ofimática disponible",
+        }
 
     def _run_soffice(self, task, source: Path, convert_to: str, reporter, *, index=0, total=1, infilter=None):
         binary = locate_binary("soffice", task.options)
@@ -64,18 +77,18 @@ class OfficeProcessor(BaseProcessor):
 
     @action()
     def office_to_pdf(self, task, reporter):
-        if not locate_binary("soffice", task.options):
+        # Keep the processor-level binary lookup as the compatibility seam used by
+        # settings/tests, while the actual cascade remains shared below.
+        if not locate_binary("soffice", task.options) and not any(
+            kind and com_available(kind)
+            for kind in (office_kind_for_extension(Path(name).suffix) for name in task.inputFiles)
+        ):
             raise EngineError(
                 "BINARY_NOT_FOUND",
-                "LibreOffice (soffice) no encontrado",
-                "Instala LibreOffice o indica la ruta de soffice.exe en Ajustes.",
+                "No hay ninguna suite ofimática disponible para convertir a PDF",
+                NO_ENGINE_DETAILS,
             )
-        inputs = require_inputs(task)
-        unsupported = [source.suffix.lower() for source in inputs if source.suffix.lower() not in SUPPORTED_OFFICE_EXTENSIONS]
-        if unsupported:
-            raise EngineError("INVALID_TASK", f"Formato Office no soportado: {unsupported[0]}")
-        outputs = [self._run_soffice(task, source, "pdf", reporter, index=i, total=len(inputs)) for i, source in enumerate(inputs)]
-        return outputs, {"binary": locate_binary("soffice", task.options)}
+        return convert_office_to_pdf(task, reporter)
 
     @action()
     def pdf_to_docx(self, task, reporter):

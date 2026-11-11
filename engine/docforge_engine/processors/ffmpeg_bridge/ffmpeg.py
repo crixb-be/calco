@@ -12,6 +12,7 @@ from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.binaries import locate_binary
 from ...util.paths import output_path, release_output_path, require_inputs, safe_stem
+from ...util.proc import no_window_kwargs
 
 
 def _kill_process_tree(process: subprocess.Popen) -> None:
@@ -27,8 +28,8 @@ def _kill_process_tree(process: subprocess.Popen) -> None:
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 timeout=15,
+                **no_window_kwargs(),
             )
         except Exception:
             pass
@@ -83,7 +84,7 @@ class FfmpegProcessor(BaseProcessor):
                 command = [binary, "-y", "-i", str(source), *args, str(temp_out)]
                 popen_kwargs = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL}
                 if sys.platform == "win32":
-                    popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                    popen_kwargs.update(no_window_kwargs(extra_creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)))
                 else:
                     popen_kwargs["start_new_session"] = True
                 with stderr_path.open("w", encoding="utf-8", errors="replace") as stderr:

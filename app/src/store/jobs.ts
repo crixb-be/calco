@@ -4,7 +4,7 @@ import { cancelTask, runTask } from "@/lib/engine";
 import { notifyTaskEvent } from "@/lib/notifications";
 
 export type JobStatus = "queued" | "running" | "cancelling" | "success" | "error" | "cancelled";
-export interface Job { task: ProcessorTask; progress: number; status: JobStatus; message: string; logs: { level: string; message: string }[]; outputFiles: string[]; meta?: Record<string, unknown>; }
+export interface Job { task: ProcessorTask; progress: number; status: JobStatus; message: string; details?: string; logs: { level: string; message: string }[]; outputFiles: string[]; meta?: Record<string, unknown>; }
 interface JobStore { jobs: Job[]; add: (task: ProcessorTask) => Promise<void>; apply: (event: TaskEvent) => void; cancel: (id: string) => Promise<void>; }
 
 const isFinal = (status: JobStatus) => status === "success" || status === "error" || status === "cancelled";
@@ -31,12 +31,12 @@ function reduce(job: Job, event: TaskEvent): Job {
   if (event.code === "CANCELLED") {
     const logs = [...job.logs, { level: "error", message: `[${event.code}] ${event.message}` }];
     if (event.details) logs.push({ level: "error", message: event.details });
-    return { ...job, status: "cancelled", message: event.message, logs };
+    return { ...job, status: "cancelled", message: event.message, details: event.details, logs };
   }
   if (job.status === "cancelled" || job.status === "success" || job.status === "error") return job;
   const logs = [...job.logs, { level: "error", message: `[${event.code}] ${event.message}` }];
   if (event.details) logs.push({ level: "error", message: event.details });
-  return { ...job, status: event.code === "CANCELLED" ? "cancelled" : "error", message: event.message, logs };
+  return { ...job, status: "error", message: event.message, details: event.details, logs };
 }
 
 export const useJobs = create<JobStore>((set, get) => ({

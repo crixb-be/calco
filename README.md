@@ -24,6 +24,28 @@ sidecar compilado. Para construirlo, ejecuta `python engine/build_sidecar.py` y
 deja el binario generado en `app/src-tauri/binaries/`; luego usa el flujo de
 empaquetado de Tauri.
 
-LibreOffice y FFmpeg no se embeben: son opcionales y se buscan en `PATH` o en
-las rutas que guardes desde Ajustes. Docling usa modelos locales después del
-prefetch inicial.
+## Conversión de Office a PDF
+
+LibreOffice ya **no es obligatorio**. Para convertir documentos Office a PDF,
+DocForge prueba los motores en cascada:
+
+1. **Microsoft Office** (Word, Excel o PowerPoint según el archivo), si está
+   instalado. Se usa por COM en una instancia propia e invisible, sin tocar los
+   documentos que tengas abiertos.
+2. **LibreOffice**, si Office no está o no puede abrir el archivo. Se busca en
+   la ruta de Ajustes, `DOCFORGE_SOFFICE`, `PATH`, Program Files, AppData,
+   LibreOffice Portable, Scoop, Chocolatey y el registro de Windows.
+3. Si no hay ninguno, la tarea muestra las alternativas disponibles.
+
+La opción de tarea `officeEngine` (`auto` por defecto, `msoffice` o
+`libreoffice`) fuerza un motor concreto. La variable de entorno
+`DOCFORGE_DISABLE_OFFICE_COM=1` desactiva Microsoft Office (la usan las pruebas).
+
+FFmpeg tampoco se embebe: es opcional y se busca en `PATH` o en la ruta que
+guardes desde Ajustes. Docling usa modelos locales después del prefetch inicial.
+
+## Sidecar
+
+`python engine/build_sidecar.py --lite` genera el sidecar sin Docling/Torch y
+con optimización de bytecode `-OO` por defecto. La build completa usa `-O0`
+salvo que pases `--optimize 2`. `--upx` activa la compresión UPX (opcional).

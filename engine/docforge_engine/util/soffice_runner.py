@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..errors import EngineError
+from .proc import no_window_kwargs
 
 DEFAULT_TIMEOUT_SEC = 60.0
 _POLL_SEC = 0.25
@@ -69,7 +70,7 @@ def _kill_tree(process: subprocess.Popen) -> None:
             subprocess.run(
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=15,
+                timeout=15, **no_window_kwargs(),
             )
         except Exception:
             pass
@@ -168,7 +169,7 @@ def convert_with_soffice(
         _log(f"Comando: {cmdline}")
         popen_kwargs: dict = {}
         if sys.platform == "win32":
-            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            popen_kwargs.update(no_window_kwargs())
         else:
             popen_kwargs["start_new_session"] = True
 
