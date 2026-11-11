@@ -13,7 +13,8 @@ interface PdfEditorState {
   future: EditorSnapshot[];
   reset: () => void;
   select: (id: string | null) => void;
-  add: (element: PdfElement) => void;
+  /** New elements are not selected unless `select` is true (selection belongs to the Selección tool). */
+  add: (element: PdfElement, select?: boolean) => void;
   update: (id: string, updater: (element: PdfElement) => PdfElement, history?: boolean) => void;
   remove: (id: string) => void;
   commit: (before: PdfElement[], beforeSelected?: string | null) => void;
@@ -30,7 +31,7 @@ export const usePdfEditorStore = create<PdfEditorState>((set) => ({
   ...initial,
   reset: () => set({ ...initial }),
   select: (selectedId) => set({ selectedId }),
-  add: (element) => set((state) => ({ elements: [...state.elements, element], selectedId: element.id, past: [...state.past, snapshot(state)], future: [] })),
+  add: (element, select = false) => set((state) => ({ elements: [...state.elements, element], selectedId: select ? element.id : null, past: [...state.past, snapshot(state)], future: [] })),
   update: (id, updater, history = true) => set((state) => {
     const next = state.elements.map((element) => element.id === id ? updater(element) : element);
     return history ? { elements: next, past: [...state.past, snapshot(state)], future: [] } : { elements: next };

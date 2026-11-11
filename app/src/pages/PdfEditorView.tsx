@@ -95,25 +95,39 @@ export default function PdfEditorView() {
   const onSelectPanel = useCallback((id: string) => { select(id); document.getElementById(`pdf-canvas-element-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [select]);
 
   function updateSelected(patch: Partial<PdfElement>) {
-    if (selected) updateElement(selected.id, (element) => ({ ...element, ...patch } as PdfElement));
+    if (!selected) return;
+    updateElement(selected.id, (element) => ({ ...element, ...patch } as PdfElement));
+    // Keep the matching tool's defaults in sync so the next stroke/shape uses the same style.
+    syncDefaults(selected.kind, patch);
   }
 
   function updateTool(patch: Partial<PdfElement>) {
+    syncDefaults(tool, patch);
+  }
+
+  function syncDefaults(target: EditorTool | PdfElement["kind"], patch: Partial<PdfElement>) {
+    if (target === "image" || target === "pointer") return;
     if ("font" in patch && patch.font) setTextDefaults((current) => ({ ...current, font: patch.font as PdfFont }));
     if ("bold" in patch && typeof patch.bold === "boolean") setTextDefaults((current) => ({ ...current, bold: patch.bold as boolean }));
     if ("italic" in patch && typeof patch.italic === "boolean") setTextDefaults((current) => ({ ...current, italic: patch.italic as boolean }));
     if ("size" in patch && typeof patch.size === "number") setTextDefaults((current) => ({ ...current, size: patch.size as number }));
     if ("color" in patch && typeof patch.color === "string") {
-      if (tool === "highlight") setHighlightColor(patch.color);
-      else if (tool === "ink") setStrokeDefaults((current) => ({ ...current, color: patch.color as string }));
-      else if (["rect", "ellipse", "arrow", "line"].includes(tool)) setShapeDefaults((current) => ({ ...current, color: patch.color as string }));
+      if (target === "highlight") setHighlightColor(patch.color);
+      else if (target === "ink") setStrokeDefaults((current) => ({ ...current, color: patch.color as string }));
+      else if (["rect", "ellipse", "arrow", "line"].includes(target)) setShapeDefaults((current) => ({ ...current, color: patch.color as string }));
       else setTextDefaults((current) => ({ ...current, color: patch.color as string }));
     }
     if ("width" in patch && typeof patch.width === "number") {
-      if (tool === "ink") setStrokeDefaults((current) => ({ ...current, width: patch.width as number }));
+      if (target === "ink") setStrokeDefaults((current) => ({ ...current, width: patch.width as number }));
       else setShapeDefaults((current) => ({ ...current, width: patch.width as number }));
     }
     if ("fill" in patch) setShapeDefaults((current) => ({ ...current, fill: (patch.fill as string | null | undefined) ?? null }));
+  }
+
+  function changeTool(next: EditorTool) {
+    setTool(next);
+    // Drawing tools edit their own defaults: drop any selection so the properties bar targets the tool.
+    if (next !== "pointer") select(null);
   }
 
   function scrollToPage(page: number) {
@@ -143,7 +157,9 @@ export default function PdfEditorView() {
         const page = pageSizes[currentPage] ?? { width: 612, height: 792 };
         const w = page.width * 0.4;
         const h = w * image.naturalHeight / Math.max(image.naturalWidth, 1);
-        addElement({ id: crypto.randomUUID(), page: currentPage, kind: "image", x: (page.width - w) / 2, y: (page.height - h) / 2, w, h, path });
+        // Inserted images stay selected (in Selección) so they can be moved/resized right away.
+        setTool("pointer");
+        addElement({ id: crypto.randomUUID(), page: currentPage, kind: "image", x: (page.width - w) / 2, y: (page.height - h) / 2, w, h, path }, true);
       };
       image.src = src;
     } catch (reason) { showToast("error", reason instanceof Error ? reason.message : "No se pudo cargar la imagen."); }
@@ -159,7 +175,7 @@ export default function PdfEditorView() {
     <div className="flex items-start gap-4"><div className="rounded-lg bg-primary/10 p-2 text-primary"><PenTool size={18} /></div><div><p className="eyebrow">Stirling-PDF Core</p><h1 className="text-xl font-bold">Editar PDF</h1><p className="mt-0.5 text-sm text-muted-foreground">Edita texto, imágenes y anotaciones sin salir de DocForge.</p></div></div>
     <Card className="space-y-4 p-4">
       <FileDrop tool={editorTool} files={files} onChange={setFiles} outputDir={outputDir} onOutputDirChange={setOutputDir} />
-      <Toolbar tool={tool} selected={selected} textDefaults={textDefaults} strokeDefaults={strokeDefaults} shapeDefaults={shapeDefaults} highlightColor={highlightColor} canUndo={past.length > 0} canRedo={future.length > 0} exportDisabled={!files[0] || !outputDir || !elements.length} onExport={() => void exportPdf()} onTool={setTool} onImage={() => void chooseImage()} onUpdateSelected={updateSelected} onUpdateTool={updateTool} onUndo={undo} onRedo={redo} onDelete={() => selectedId && removeElement(selectedId)} />
+      <Toolbar tool={tool} selected={selected} textDefaults={textDefaults} strokeDefaults={strokeDefaults} shapeDefaults={shapeDefaults} highlightColor={highlightColor} canUndo={past.length > 0} canRedo={future.length > 0} exportDisabled={!files[0] || !outputDir || !elements.length} onExport={() => void exportPdf()} onTool={changeTool} onImage={() => void chooseImage()} onUpdateSelected={updateSelected} onUpdateTool={updateTool} onUndo={undo} onRedo={redo} onDelete={() => selectedId && removeElement(selectedId)} />
       {error && <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
       {pdf ? <div className="flex flex-col lg:flex-row">
         <div ref={setScrollRoot} onWheel={(event) => { if (event.ctrlKey) { event.preventDefault(); setZoom((value) => Math.max(0.25, Math.min(3, value * (event.deltaY < 0 ? 1.1 : 0.9)))); } }} className="relative min-w-0 flex-1 overflow-auto rounded-lg bg-slate-900/70 p-4"><div className="mx-auto max-w-5xl pb-16">{Array.from({ length: pdf.numPages }, (_, index) => <PageLayer key={index + 1} document={pdf} pageNumber={index + 1} zoom={zoom} tool={tool} elements={elements} selectedId={selectedId} imageSources={imageSources} textDefaults={textDefaults} strokeDefaults={strokeDefaults} shapeDefaults={shapeDefaults} highlightColor={highlightColor} scrollRoot={scrollRoot} onSelect={select} onAdd={addElement} onUpdate={updateElement} onCommit={commit} onPageVisible={onPageVisible} onPageSize={onPageSize} />)}</div><div className="absolute bottom-3 right-3 z-20 flex w-fit items-center gap-1 rounded-full border bg-card/95 p-1.5 shadow-xl backdrop-blur"><Button type="button" size="icon-sm" variant="ghost" className="bg-muted/60 hover:bg-accent" onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage <= 0} title="Página anterior" aria-label="Página anterior"><ChevronLeft size={16} /></Button><span className="min-w-16 text-center text-xs tabular-nums">{currentPage + 1} / {pdf.numPages}</span><Button type="button" size="icon-sm" variant="ghost" className="bg-muted/60 hover:bg-accent" onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage >= pdf.numPages - 1} title="Página siguiente" aria-label="Página siguiente"><ChevronRight size={16} /></Button><span className="mx-1 h-5 w-px bg-border" /><Button type="button" size="icon-sm" variant="ghost" className="bg-muted/60 hover:bg-accent" onClick={() => setZoom((value) => Math.max(0.25, Math.round((value - 0.1) * 10) / 10))} title="Alejar" aria-label="Alejar"><ZoomOut size={16} /></Button><span className="min-w-12 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span><Button type="button" size="icon-sm" variant="ghost" className="bg-muted/60 hover:bg-accent" onClick={() => setZoom((value) => Math.min(3, Math.round((value + 0.1) * 10) / 10))} title="Acercar" aria-label="Acercar"><ZoomIn size={16} /></Button><Button type="button" size="icon-sm" variant="ghost" className="bg-muted/60 hover:bg-accent" onClick={fitWidth} title="Ajustar ancho" aria-label="Ajustar ancho"><Maximize2 size={16} /></Button></div></div>
