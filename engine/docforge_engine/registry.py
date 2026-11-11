@@ -6,6 +6,7 @@ from typing import Any
 from .base import BaseProcessor, ProgressReporter
 from .contract import ProcessorTask
 from .errors import EngineError
+from .util.paths import task_reservations
 from .processors.docling.docling_parser import DoclingParser
 from .processors.ffmpeg_bridge.ffmpeg import FfmpegProcessor
 from .processors.office_bridge.soffice import OfficeProcessor
@@ -68,7 +69,8 @@ class EngineRegistry:
         processor = self.processors.get(task.engine)
         if processor is None:
             raise EngineError("INVALID_TASK", f"Unknown engine '{task.engine}'")
-        return processor.execute(task.action, task, ProgressReporter(task.id, emit, cancel))
+        with task_reservations():
+            return processor.execute(task.action, task, ProgressReporter(task.id, emit, cancel))
 
     def health(self) -> dict[str, Any]:
         return {name: processor.health() if hasattr(processor, "health") else {"available": True} for name, processor in self.processors.items()}

@@ -5,7 +5,7 @@ import { revealInFolder } from "@/lib/engine";
 import { useJobs, type Job } from "@/store/jobs";
 import { doclingViewerRequest, type DoclingViewerRequest } from "@/components/docling/DoclingDualViewer";
 
-export const isActiveJob = (job: Job) => job.status === "running" || job.status === "queued";
+export const isActiveJob = (job: Job) => job.status === "running" || job.status === "queued" || job.status === "cancelling";
 
 /** Number of jobs still queued or running (drives the "Actividad" badge). */
 export function useActiveJobCount() {
@@ -85,6 +85,8 @@ export function JobList({ onViewDocling }: Props) {
                     ? "Error"
                     : job.status === "cancelled"
                       ? "Cancelado"
+                      : job.status === "cancelling"
+                        ? "Cancelando…"
                       : `${Math.round(job.progress)}%`}
               </span>
               {isActive ? (

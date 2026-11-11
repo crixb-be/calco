@@ -1,14 +1,67 @@
 from __future__ import annotations
 
-import shutil
+import os
+import signal
 import subprocess
+import sys
 import tempfile
+import time
 from pathlib import Path
 
 from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.binaries import locate_binary
-from ...util.paths import atomic_write_bytes, output_path, require_inputs, safe_stem
+from ...util.paths import output_path, release_output_path, require_inputs, safe_stem
+
+
+def _kill_process_tree(process: subprocess.Popen) -> None:
+    """Stop ffmpeg and any children without leaving inherited handles behind."""
+    if sys.platform == "win32":
+        try:
+            process.terminate()
+            process.wait(timeout=1)
+        except Exception:
+            pass
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                timeout=15,
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        except Exception:
+            try:
+                process.terminate()
+            except Exception:
+                pass
+        try:
+            process.wait(timeout=1)
+        except Exception:
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            except Exception:
+                pass
+    try:
+        process.kill()
+    except Exception:
+        pass
+    try:
+        process.wait(timeout=5)
+    except Exception:
+        pass
+
+
+def _stderr_tail(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[-4000:].strip()
+    except OSError:
+        return ""
 
 
 class FfmpegProcessor(BaseProcessor):
@@ -23,13 +76,49 @@ class FfmpegProcessor(BaseProcessor):
         if not binary:
             raise EngineError("BINARY_NOT_FOUND", "ffmpeg was not found")
         out = output_path(task, safe_stem(source), task.action, f".{extension}")
-        with tempfile.TemporaryDirectory(dir=task.outputDir) as temp_dir:
-            temp_out = Path(temp_dir) / f"output.{extension}"
-            command = [binary, "-y", "-i", str(source), *args, str(temp_out)]
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=600)
-            if completed.returncode != 0 or not temp_out.exists():
-                raise EngineError("INTERNAL", f"ffmpeg failed for {source.name}", completed.stderr[-4000:])
-            atomic_write_bytes(out, temp_out.read_bytes())
+        try:
+            with tempfile.TemporaryDirectory(dir=task.outputDir) as temp_dir:
+                temp_out = Path(temp_dir) / f"output.{extension}"
+                stderr_path = Path(temp_dir) / "stderr.log"
+                command = [binary, "-y", "-i", str(source), *args, str(temp_out)]
+                popen_kwargs = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL}
+                if sys.platform == "win32":
+                    popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                else:
+                    popen_kwargs["start_new_session"] = True
+                with stderr_path.open("w", encoding="utf-8", errors="replace") as stderr:
+                    process = subprocess.Popen(command, stderr=stderr, **popen_kwargs)
+                    started = time.monotonic()
+                    while process.poll() is None:
+                        try:
+                            reporter.check_cancelled()
+                        except EngineError as exc:
+                            _kill_process_tree(process)
+                            raise EngineError("CANCELLED", exc.message, _stderr_tail(stderr_path)) from exc
+                        elapsed = time.monotonic() - started
+                        if elapsed >= 600:
+                            _kill_process_tree(process)
+                            raise EngineError(
+                                "TIMEOUT",
+                                f"ffmpeg super\u00f3 el tiempo l\u00edmite de 600s convirtiendo {source.name}",
+                                _stderr_tail(stderr_path),
+                            )
+                        time.sleep(0.1)
+                    returncode = process.returncode
+                try:
+                    reporter.check_cancelled()
+                except EngineError as exc:
+                    raise EngineError(exc.code, exc.message, _stderr_tail(stderr_path)) from exc
+                stderr_tail = _stderr_tail(stderr_path)
+                if returncode != 0 or not temp_out.exists():
+                    raise EngineError("INTERNAL", f"ffmpeg failed for {source.name}", stderr_tail)
+                # The temporary directory is under outputDir, so this is an atomic
+                # same-volume move and avoids loading the whole video into Python RAM.
+                os.replace(temp_out, out)
+                release_output_path(out, remove_placeholder=False)
+        except Exception:
+            release_output_path(out)
+            raise
         reporter.report(100, f"Converted {source.name}")
         return [str(out)], {}
 

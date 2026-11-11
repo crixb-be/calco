@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -136,9 +137,17 @@ def export_file(params: dict[str, Any]) -> dict[str, Any]:
     if os.path.normcase(str(source)) == os.path.normcase(str(target)):
         return {"path": str(target)}
     target.parent.mkdir(parents=True, exist_ok=True)
-    temp = target.with_name(f".{target.name}.docforge-tmp")
-    shutil.copyfile(source, temp)
-    os.replace(temp, target)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{target.name}.docforge-tmp-", dir=target.parent)
+    os.close(fd)
+    temp = Path(temp_name)
+    try:
+        shutil.copyfile(source, temp)
+        os.replace(temp, target)
+    finally:
+        try:
+            temp.unlink()
+        except FileNotFoundError:
+            pass
     return {"path": str(target)}
 
 

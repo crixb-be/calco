@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowDown, ArrowUp, FilePlus2, FolderOpen, X } from "lucide-react";
@@ -8,7 +8,17 @@ interface Props { tool: ToolDefinition; files: string[]; onChange: (files: strin
 export default function FileDrop({ tool, files, onChange, outputDir, onOutputDirChange }: Props) {
   const [dragging, setDragging] = useState(false);
   const addFiles = (paths: string[]) => onChange(tool.multiFile ? [...files, ...paths.filter((path) => !files.includes(path))] : paths.slice(0, 1));
-  useEffect(() => { let off: (() => void) | undefined; listen<{ paths: string[] }>("tauri://drag-drop", (event) => addFiles(event.payload.paths)).then((unlisten) => { off = unlisten; }); return () => off?.(); });
+  const addFilesRef = useRef(addFiles);
+  addFilesRef.current = addFiles;
+  useEffect(() => {
+    let disposed = false;
+    let off: (() => void) | undefined;
+    void listen<{ paths: string[] }>("tauri://drag-drop", (event) => addFilesRef.current(event.payload.paths)).then((unlisten) => {
+      if (disposed) unlisten();
+      else off = unlisten;
+    });
+    return () => { disposed = true; off?.(); };
+  }, []);
   async function pickFiles() { const picked = await open({ multiple: tool.multiFile, directory: false, filters: [{ name: "Archivos compatibles", extensions: tool.extensions }] }); if (picked) addFiles(Array.isArray(picked) ? picked : [picked]); }
   async function pickDir() { const picked = await open({ directory: true, multiple: false }); if (picked && typeof picked === "string") onOutputDirChange(picked); }
   return <div className="space-y-3">

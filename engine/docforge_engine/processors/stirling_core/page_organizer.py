@@ -10,6 +10,8 @@ from ...errors import EngineError
 from ...util.paths import atomic_save, output_path, safe_stem
 from .common import one_input, pymupdf_module
 
+MAX_LEGACY_THUMBNAIL_PAGES = 50
+
 
 def _rotation(value: Any) -> int:
     try:
@@ -26,6 +28,12 @@ def render_page_thumbnails(source: Path) -> list[dict[str, Any]]:
     pymupdf = pymupdf_module()
     document = pymupdf.open(str(source))
     try:
+        if document.page_count > MAX_LEGACY_THUMBNAIL_PAGES:
+            raise EngineError(
+                "INVALID_TASK",
+                f"get_pdf_thumbnails admite como m\u00e1ximo {MAX_LEGACY_THUMBNAIL_PAGES} p\u00e1ginas; "
+                "use get_pdf_pages_metadata y get_page_thumbnails para PDFs grandes",
+            )
         pages = []
         for index, page in enumerate(document):
             pix = page.get_pixmap(dpi=72, alpha=False)

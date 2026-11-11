@@ -20,7 +20,6 @@ This runner:
 from __future__ import annotations
 
 import os
-import contextlib
 import shutil
 import signal
 import subprocess
@@ -62,19 +61,25 @@ def neutral_temp_root() -> Path:
 
 
 def _kill_tree(process: subprocess.Popen) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        if sys.platform == "win32":
+    if sys.platform == "win32":
+        # The launcher can exit before its soffice.bin child does. Run taskkill
+        # even when poll() says the direct child is gone, so inherited handles
+        # held by the process tree cannot keep temp files open.
+        try:
             subprocess.run(
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=15,
             )
-        else:
+        except Exception:
+            pass
+    else:
+        if process.poll() is not None:
+            return
+        try:
             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-    except Exception:
-        pass
+        except Exception:
+            pass
     try:
         process.kill()
         process.wait(timeout=5)
@@ -129,8 +134,12 @@ def convert_with_soffice(
     target_ext = convert_to.split(":", 1)[0].strip().lower()
     expected = output_dir / f"{input_file.stem}.{target_ext}"
 
-    with tempfile.TemporaryDirectory(prefix="docforge-lo-", dir=neutral_temp_root()) as work:
-        work_dir = Path(work)
+    work_ctx = tempfile.TemporaryDirectory(prefix="docforge-lo-", dir=neutral_temp_root())
+    log_root = Path(tempfile.mkdtemp(prefix="docforge-lo-logs-", dir=neutral_temp_root()))
+    stdout_path = log_root / "stdout.log"
+    stderr_path = log_root / "stderr.log"
+    try:
+        work_dir = Path(work_ctx.name)
         in_dir, out_tmp = work_dir / "in", work_dir / "out"
         in_dir.mkdir()
         out_tmp.mkdir()
@@ -157,17 +166,16 @@ def convert_with_soffice(
         cmd += ["--convert-to", convert_to, "--outdir", str(out_tmp), str(neutral_input)]
         cmdline = subprocess.list2cmdline(cmd)
         _log(f"Comando: {cmdline}")
-
         popen_kwargs: dict = {}
         if sys.platform == "win32":
             popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         else:
             popen_kwargs["start_new_session"] = True
 
-        with contextlib.nullcontext():
+        with stdout_path.open("wb") as stdout_handle, stderr_path.open("wb") as stderr_handle:
             try:
                 process = subprocess.Popen(
-                    cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    cmd, stdin=subprocess.DEVNULL, stdout=stdout_handle, stderr=stderr_handle,
                 # Do not use the disposable work directory as CWD: soffice.exe may
                 # spawn a child that keeps that directory open on Windows.
                 cwd=str(neutral_temp_root()), **popen_kwargs,
@@ -179,19 +187,16 @@ def convert_with_soffice(
             _log(f"PID lanzado: {process.pid}; esperando proceso (timeout {timeout_sec:.0f}s)")
             started = time.monotonic()
             next_heartbeat = _HEARTBEAT_LOG_SEC
-            aborted = False
             try:
                 while process.poll() is None:
                     elapsed = time.monotonic() - started
                     if is_cancelled and is_cancelled():
                         _kill_tree(process)
                         _log(f"Cancelado; árbol de procesos {process.pid} terminado", "warn")
-                        aborted = True
                         raise EngineError("CANCELLED", "Conversión cancelada")
                     if elapsed > timeout_sec:
                         _kill_tree(process)
                         _log(f"Timeout tras {elapsed:.0f}s; árbol de procesos {process.pid} terminado", "error")
-                        aborted = True
                         raise EngineError(
                             "TIMEOUT",
                             f"LibreOffice superó el tiempo límite de {timeout_sec:.0f}s convirtiendo {input_file.name}",
@@ -207,34 +212,13 @@ def convert_with_soffice(
             finally:
                 if process.poll() is None:
                     _kill_tree(process)
-                # Be explicit on Windows after cancellation/timeout: a launcher may leave inherited handles around
-                # even after the child exits. This is a no-op for our file-backed streams,
-                # but also protects callers that replace Popen with PIPE-backed fakes.
                 # Never call communicate() after a timeout: a soffice grandchild can
-                # intentionally retain the inherited pipe and block forever. Closing the
-                # descriptors here is what releases the parent-side Windows handles.
-                if process.poll() is None:
-                    _kill_tree(process)
-                if aborted:
-                    for stream in (getattr(process, "stdout", None), getattr(process, "stderr", None)):
-                        if stream is not None:
-                            try:
-                                stream.close()
-                            except OSError:
-                                pass
-
-        try:
-            stdout_bytes, stderr_bytes = process.communicate(timeout=5)
-        except subprocess.TimeoutExpired:
-            _kill_tree(process)
-            for stream in (getattr(process, "stdout", None), getattr(process, "stderr", None)):
-                if stream is not None:
-                    stream.close()
-            stdout_bytes, stderr_bytes = b"", b""
+                # intentionally retain an inherited pipe and block forever. Output
+                # is file-backed, so closing these handles releases the descriptors.
         returncode = process.returncode
         duration = time.monotonic() - started
-        stdout = (stdout_bytes or b"").decode("utf-8", errors="replace").strip()
-        stderr = (stderr_bytes or b"").decode("utf-8", errors="replace").strip()
+        stdout = _tail(stdout_path)
+        stderr = _tail(stderr_path)
         _log(f"Proceso terminado: código de retorno {returncode} en {duration:.1f}s")
         if stdout:
             _log(f"stdout de LibreOffice: {stdout}")
@@ -259,4 +243,7 @@ def convert_with_soffice(
             expected.unlink()
         shutil.move(str(generated), str(expected))
         _log(f"Resultado movido a: {expected}")
+    finally:
+        work_ctx.cleanup()
+        shutil.rmtree(log_root, ignore_errors=True)
     return expected

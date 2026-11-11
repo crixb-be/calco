@@ -81,6 +81,12 @@ def file_hash(pdf_path: str | Path) -> str:
     return hashlib.sha1(key.encode("utf-8")).hexdigest()
 
 
+def _password_cache_key(password: str | None) -> str:
+    if password is None:
+        return ""
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
 class _LRU:
     def __init__(self, capacity: int, on_evict=None):
         self.capacity = capacity
@@ -134,11 +140,12 @@ class ThumbnailService:
         if not path.is_file():
             raise EngineError("INPUT_NOT_FOUND", f"Archivo no encontrado: {path}")
         digest = file_hash(path)
-        entry = self._docs.get(digest)
+        document_key = (digest, _password_cache_key(password))
+        entry = self._docs.get(document_key)
         if entry is not None:
             return digest, entry
         with self._open_lock:
-            entry = self._docs.get(digest)
+            entry = self._docs.get(document_key)
             if entry is not None:
                 return digest, entry
             fitz = _fitz()
@@ -151,7 +158,9 @@ class ThumbnailService:
                     doc.close()
                     raise EngineError("WRONG_PASSWORD", f"El PDF está protegido con contraseña: {path.name}")
             entry = _OpenDoc(doc)
-            self._docs.put(digest, entry)
+            # Passwords are represented only by a digest in the cache key. A
+            # passwordless call therefore cannot reuse an authenticated document.
+            self._docs.put(document_key, entry)
             return digest, entry
 
     # ------------------------------------------------------------------ metadata
@@ -209,14 +218,15 @@ class ThumbnailService:
         digest, entry = self._document(pdf_path, password)
         zoom = self._zoom(entry, index, max_width, tier)
         dpi = int(round(zoom * 72))
+        cache_digest = digest if password is None else f"{digest}-{_password_cache_key(password)}"
         variant = f"{tier}_{max_width}_{dpi}"  # cache key: hash / tier_width_dpi / index
-        key = (digest, variant, index, fmt)
+        key = (cache_digest, variant, index, fmt)
         cached = self._images.get(key)
         if cached is None:
-            cached = self._from_disk(digest, variant, index, fmt)
+            cached = self._from_disk(cache_digest, variant, index, fmt)
         if cached is None:
             cached = self._render(entry, index, zoom, fmt)
-            self._to_disk(digest, variant, index, fmt, cached)
+            self._to_disk(cache_digest, variant, index, fmt, cached)
         self._images.put(key, cached)
         data, width, height, real_fmt = cached
         url = f"data:{_MIME[real_fmt]};base64,{base64.b64encode(data).decode('ascii')}"
