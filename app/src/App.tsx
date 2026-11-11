@@ -118,10 +118,19 @@ export default function App() {
           <div className="rounded-lg bg-primary p-2 text-primary-foreground">
             <FileStack size={20} />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="font-bold tracking-tight">DocForge</p>
             <p className="text-[10px] uppercase tracking-[.18em] text-muted-foreground">Desktop</p>
           </div>
+          <button
+            type="button"
+            title="Cambiar tema"
+            aria-label="Cambiar tema"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
         </div>
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {(() => {
@@ -172,42 +181,33 @@ export default function App() {
               </button>
             );
           })}
+          <div className="mt-4 space-y-1 border-t pt-4">
+            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Sistema</p>
+            <button
+              type="button"
+              onClick={() => {
+                setActivityOpen(false);
+                setPage("settings");
+                setDomain(undefined);
+              }}
+              className={navClass(page === "settings")}
+            >
+              <span className={navIcon(page === "settings")}><SettingsIcon size={16} /></span> Ajustes
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActivityOpen(false);
+                setPage("developer");
+                setDomain(undefined);
+              }}
+              className={navClass(page === "developer")}
+            >
+              <span className={navIcon(page === "developer")}><Code2 size={16} /></span> Desarrollador
+            </button>
+          </div>
         </nav>
-        <div className="mt-auto shrink-0 space-y-1 border-t bg-background/30 p-3">
-          <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Sistema</p>
-          <button
-            type="button"
-            onClick={() => {
-              setActivityOpen(false);
-              setPage("settings");
-              setDomain(undefined);
-            }}
-            className={navClass(page === "settings")}
-          >
-            <span className={navIcon(page === "settings")}><SettingsIcon size={16} /></span> Ajustes
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActivityOpen(false);
-              setPage("developer");
-              setDomain(undefined);
-            }}
-            className={navClass(page === "developer")}
-          >
-            <span className={navIcon(page === "developer")}><Code2 size={16} /></span> Desarrollador
-          </button>
-          <button
-            type="button"
-            title="Cambiar tema"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className={navClass(false)}
-          >
-            <span className={navIcon(false)}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}</span>
-            {theme === "dark" ? "Tema claro" : "Tema oscuro"}
-          </button>
-          {appVersion && <p className="px-3 pt-1 text-[10px] text-muted-foreground">DocForge Desktop v{appVersion}</p>}
-        </div>
+        {appVersion && <p className="shrink-0 border-t px-5 py-2.5 text-[10px] text-muted-foreground">DocForge Desktop v{appVersion}</p>}
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">

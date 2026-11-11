@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Code2, ExternalLink, Github, Globe, Linkedin, Mail, Scale, type LucideIcon } from "lucide-react";
+import { BookOpen, Code2, ExternalLink, Facebook, Github, Instagram, Mail, Scale, type LucideIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Badge, Card } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
@@ -15,17 +15,19 @@ const DEVELOPER = {
   github: "https://github.com/crixb-be",
   repository: "https://github.com/crixb-be/docforge-desktop",
   license: "MIT",
-  linkedin: "",
-  website: "",
-  email: "",
+  instagram: "https://www.instagram.com/cristhian.billy/",
+  facebook: "https://www.facebook.com/cristhian.bustamanteespinoza/",
+  email: "cristhianbbe7@gmail.com",
 };
+
+/** Degradado exacto del banner del perfil. */
+const BANNER_GRADIENT = "linear-gradient(90deg, rgba(2, 0, 36, 1) 0%, rgba(9, 9, 121, 1) 35%, rgba(0, 212, 255, 1) 100%)";
 
 const STACK = ["Tauri", "Rust", "React", "Python", "PyMuPDF"];
 
-const SOCIALS: { key: "linkedin" | "website" | "email"; label: string; icon: LucideIcon }[] = [
-  { key: "linkedin", label: "LinkedIn", icon: Linkedin },
-  { key: "website", label: "Portafolio / Web", icon: Globe },
-  { key: "email", label: "Correo", icon: Mail },
+const SOCIALS: { key: "instagram" | "facebook"; label: string; icon: LucideIcon }[] = [
+  { key: "instagram", label: "Instagram", icon: Instagram },
+  { key: "facebook", label: "Facebook", icon: Facebook },
 ];
 
 export default function DeveloperView() {
@@ -37,6 +39,14 @@ export default function DeveloperView() {
     openUrl(url).catch(() => showToast("error", "No se pudo abrir el enlace en el navegador."));
   };
 
+  const contactByEmail = () => {
+    // Copia la dirección (útil si no hay cliente de correo) y abre el cliente predeterminado.
+    navigator.clipboard?.writeText(DEVELOPER.email)
+      .then(() => showToast("success", `Correo copiado: ${DEVELOPER.email}`))
+      .catch(() => showToast("success", DEVELOPER.email));
+    open(`mailto:${DEVELOPER.email}`);
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6 lg:p-8">
       <div>
@@ -45,11 +55,11 @@ export default function DeveloperView() {
       </div>
 
       <Card className="overflow-hidden p-0">
-        <div className="h-24 bg-gradient-to-r from-primary/40 via-sky-500/20 to-violet-500/30" />
+        <div className="h-24" style={{ background: BANNER_GRADIENT }} />
         <div className="px-6 pb-6">
           <div className="-mt-12 flex flex-wrap items-end gap-4">
             {avatarFailed ? (
-              <div className="flex h-24 w-24 items-center justify-center rounded-2xl border-4 border-card bg-gradient-to-br from-primary to-violet-500 text-3xl font-bold text-white shadow-lg">
+              <div className="flex h-24 w-24 items-center justify-center rounded-2xl border-4 border-white bg-gradient-to-br from-primary to-violet-500 text-3xl font-bold text-white shadow-xl ring-1 ring-black/10">
                 {DEVELOPER.initials}
               </div>
             ) : (
@@ -57,7 +67,7 @@ export default function DeveloperView() {
                 src={DEVELOPER.avatar}
                 alt={`Foto de perfil de ${DEVELOPER.name}`}
                 onError={() => setAvatarFailed(true)}
-                className="h-24 w-24 rounded-2xl border-4 border-card bg-muted object-cover shadow-lg"
+                className="h-24 w-24 rounded-2xl border-4 border-white bg-muted object-cover shadow-xl ring-1 ring-black/10"
               />
             )}
             <div className="min-w-0 flex-1 pb-1">
@@ -93,22 +103,25 @@ export default function DeveloperView() {
             >
               <Github size={16} /> Ver perfil en GitHub
             </button>
-            {SOCIALS.map(({ key, label, icon: Icon }) => {
-              const value = DEVELOPER[key];
-              const url = key === "email" && value ? `mailto:${value}` : value;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  disabled={!url}
-                  title={url ? label : `${label}: enlace pendiente de configurar`}
-                  onClick={() => url && open(url)}
-                  className="inline-flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-4 text-sm font-semibold transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Icon size={16} /> {label}
-                </button>
-              );
-            })}
+            {SOCIALS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                title={DEVELOPER[key]}
+                onClick={() => open(DEVELOPER[key])}
+                className="inline-flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-4 text-sm font-semibold transition-colors hover:bg-accent"
+              >
+                <Icon size={16} /> {label}
+              </button>
+            ))}
+            <button
+              type="button"
+              title={`Escribir a ${DEVELOPER.email} (se copia al portapapeles)`}
+              onClick={contactByEmail}
+              className="inline-flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-4 text-sm font-semibold transition-colors hover:bg-accent"
+            >
+              <Mail size={16} /> {DEVELOPER.email}
+            </button>
           </div>
 
           <div className="mt-6 border-t pt-4">
