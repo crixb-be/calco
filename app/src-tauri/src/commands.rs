@@ -1,6 +1,6 @@
 use crate::{
     contract::{EngineHealth, ProcessorTask},
-    sidecar::SidecarManager,
+    sidecar::{hide_console, SidecarManager},
 };
 use serde_json::Value;
 use serde::Serialize;
@@ -62,7 +62,10 @@ fn libreoffice_path() -> Option<PathBuf> {
             candidates.push(PathBuf::from(root).join("LibreOffice/program/soffice.exe"));
         }
     }
-    if let Ok(output) = Command::new("where.exe").arg("soffice.exe").output() {
+    let mut where_cmd = Command::new("where.exe");
+    where_cmd.arg("soffice.exe");
+    hide_console(&mut where_cmd);
+    if let Ok(output) = where_cmd.output() {
         if output.status.success() {
             if let Some(path) = String::from_utf8_lossy(&output.stdout).lines().find(|line| !line.trim().is_empty()) {
                 candidates.push(PathBuf::from(path.trim()));
@@ -77,10 +80,10 @@ fn disk_free_bytes() -> Option<u64> {
     {
         let drive = env::current_dir().ok()?.to_string_lossy().chars().next()?.to_string();
         let command = format!("(Get-PSDrive -Name '{}').Free", drive);
-        let output = Command::new("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &command])
-            .output()
-            .ok()?;
+        let mut ps = Command::new("powershell.exe");
+        ps.args(["-NoProfile", "-NonInteractive", "-Command", &command]);
+        hide_console(&mut ps);
+        let output = ps.output().ok()?;
         if !output.status.success() {
             return None;
         }
@@ -214,10 +217,12 @@ $xml.GetElementsByTagName('text')[1].AppendChild($xml.CreateTextNode($env:DOCFOR
 $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('DocForge Desktop').Show($toast)
 "#;
-        let child = std::process::Command::new("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script])
+        let mut ps = std::process::Command::new("powershell.exe");
+        ps.args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script])
             .env("DOCFORGE_NOTIFICATION_TITLE", title)
-            .env("DOCFORGE_NOTIFICATION_BODY", body)
+            .env("DOCFORGE_NOTIFICATION_BODY", body);
+        hide_console(&mut ps);
+        let child = ps
             .spawn()
             .map_err(|error| format!("No se pudo iniciar la notificación: {error}"))?;
         drop(child);

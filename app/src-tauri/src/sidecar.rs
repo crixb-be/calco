@@ -12,6 +12,25 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// CREATE_NO_WINDOW: console children (the frozen engine, PowerShell, where.exe) must not
+/// flash a terminal window from the GUI app.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+pub(crate) fn hide_console(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = command;
+    }
+}
+
 const MAX_STDOUT_FRAME: usize = 64 * 1024 * 1024;
 const MAX_STDERR_FRAME: usize = 1024 * 1024;
 
@@ -148,7 +167,11 @@ impl SidecarManager {
             command.args(["-m", "docforge_engine", "serve"]);
             (command, engine)
         } else {
-            (Command::new(sidecar), repo)
+            // The frozen engine requires the `serve` subcommand; without it argparse exits
+            // immediately and the supervisor enters a crash/restart loop.
+            let mut command = Command::new(sidecar);
+            command.arg("serve");
+            (command, repo)
         }
     }
 
@@ -174,6 +197,7 @@ impl SidecarManager {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        hide_console(&mut command);
         let mut child = command
             .spawn()
             .map_err(|error| format!("No se pudo iniciar el motor: {error}"))?;

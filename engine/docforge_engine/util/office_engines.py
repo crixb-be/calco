@@ -29,15 +29,32 @@ def detect_office_suites(binary_path: str | None = None) -> dict:
     ``binary_path`` is the LibreOffice path saved in Settings (may be empty). When it is
     set but invalid, auto-detection still runs and ``configuredInvalid`` flags the problem.
     """
+    def _safe_com(kind: str) -> bool:
+        # One broken COM/registry probe must report "not installed", never fail the RPC.
+        try:
+            return bool(com_available(kind))
+        except Exception:
+            return False
+
     configured = (binary_path or "").strip()
-    # Validate the configured path on its own: locate_binary would silently fall back.
-    configured_path = normalize_binary("soffice", configured) if configured else None
+    configured_path = None
+    if configured:
+        # Validate the configured path on its own: locate_binary would silently fall back.
+        try:
+            configured_path = normalize_binary("soffice", configured)
+        except Exception:
+            configured_path = None
     configured_valid = configured_path is not None
-    libreoffice = str(configured_path) if configured_path else locate_binary("soffice", {})
+    libreoffice = str(configured_path) if configured_path else None
+    if libreoffice is None:
+        try:
+            libreoffice = locate_binary("soffice", {})
+        except Exception:
+            libreoffice = None
     return {
-        "msword": {"available": com_available("msword")},
-        "msexcel": {"available": com_available("msexcel")},
-        "mspowerpoint": {"available": com_available("mspowerpoint")},
+        "msword": {"available": _safe_com("msword")},
+        "msexcel": {"available": _safe_com("msexcel")},
+        "mspowerpoint": {"available": _safe_com("mspowerpoint")},
         "libreoffice": {
             "available": libreoffice is not None,
             "path": libreoffice,

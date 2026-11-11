@@ -50,11 +50,11 @@ def _com_modules():
     try:
         import pythoncom  # type: ignore
         import win32com.client  # type: ignore
-    except ImportError:
+    except Exception:  # ImportError, or OSError when frozen pywin32 DLLs fail to load
         return None
     try:
         import win32process  # type: ignore
-    except ImportError:
+    except Exception:
         win32process = None
     return pythoncom, win32com.client, win32process
 
@@ -67,7 +67,7 @@ def _registry_has_progid(progid: str) -> bool:
 
         with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, f"{progid}\\CLSID"):
             return True
-    except (ImportError, OSError):
+    except Exception:
         return False
 
 

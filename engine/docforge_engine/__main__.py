@@ -300,12 +300,14 @@ def _force_utf8_stdio() -> None:
 def main(argv=None) -> int:
     _force_utf8_stdio()
     parser = argparse.ArgumentParser(prog="docforge-engine")
-    subparsers = parser.add_subparsers(dest="mode", required=True)
-    subparsers.add_parser("serve", help="run the persistent NDJSON sidecar")
+    # No subcommand means "serve": the frozen sidecar must start on its own instead of
+    # exiting with a usage error (which made the host restart it in a loop).
+    subparsers = parser.add_subparsers(dest="mode")
+    subparsers.add_parser("serve", help="run the persistent NDJSON sidecar (default)")
     run_parser = subparsers.add_parser("run", help="run one task JSON file")
     run_parser.add_argument("task_json")
     args = parser.parse_args(argv)
-    if args.mode == "serve":
+    if args.mode in (None, "serve"):
         Sidecar().serve()
         return 0
     return run_one(args.task_json)
