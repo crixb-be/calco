@@ -201,8 +201,10 @@ export default function SettingsView({ theme, onToggleTheme }: Props) {
                 const display = path || (general ? `Hereda: ${general}` : "Hereda la general");
                 return <div key={category} className="flex items-center gap-2 rounded-md border bg-background/30 p-2">
                   <div className="min-w-0 flex-1"><p className="text-xs font-semibold">{label}</p><p className={`truncate text-xs ${path ? "text-foreground" : "text-muted-foreground"}`} title={display}>{display}</p></div>
-                  <Button type="button" variant="outline" className="h-8 w-8 shrink-0 px-0" title={title} aria-label={title} onClick={() => void chooseCategoryDir(category, title)}><FolderOpen size={14} /></Button>
-                  <Button type="button" variant="ghost" className="h-8 w-8 shrink-0 px-0" title="Heredar la carpeta general" aria-label={`Limpiar ${label}`} disabled={!path} onClick={() => { clearCategory(category); setMessage("Carpeta por tipo eliminada."); }}><RotateCcw size={14} /></Button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button type="button" title="Elegir carpeta" aria-label={`Elegir carpeta: ${title}`} onClick={() => void chooseCategoryDir(category, title)} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary transition-colors hover:bg-primary/20"><FolderOpen size={15} strokeWidth={2.2} /></button>
+                    <button type="button" title={path ? "Restablecer a general" : "Ya usa la carpeta general"} aria-label={`Restablecer ${label} a la carpeta general`} disabled={!path} onClick={() => { clearCategory(category); setMessage("Carpeta por tipo restablecida a la general."); }} className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-muted/60 text-muted-foreground transition-colors hover:border-amber-400/40 hover:bg-amber-400/10 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-muted/60 disabled:hover:text-muted-foreground"><RotateCcw size={15} strokeWidth={2.2} /></button>
+                  </div>
                 </div>;
               })}
             </div>}
