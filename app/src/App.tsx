@@ -9,6 +9,7 @@ import {
   Home as HomeIcon,
   ListChecks,
   Moon,
+  PenTool,
   Settings as SettingsIcon,
   Sun,
   type LucideIcon,
@@ -22,6 +23,7 @@ import DoclingView from "@/pages/DoclingView";
 import SecurityView from "@/pages/SecurityView";
 import PageOrganizerView from "@/pages/PageOrganizerView";
 import HistoryView from "@/pages/HistoryView";
+import PdfEditorView from "@/pages/PdfEditorView";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { useActiveJobCount } from "@/components/JobQueue";
 import { Toaster } from "@/components/ui/toast";
@@ -30,7 +32,7 @@ import { listenToTaskEvents } from "@/lib/engine";
 import { useJobs } from "@/store/jobs";
 import { useOutputDirs } from "@/store/outputDirs";
 
-type Page = "home" | "tool" | "settings" | "converter" | "history";
+type Page = "home" | "tool" | "settings" | "converter" | "history" | "pdf_editor";
 
 /** Domains that open a dedicated full-width workspace instead of the filtered catalog. */
 const DOMAIN_ICONS: Record<Domain, LucideIcon> = {
@@ -141,6 +143,17 @@ export default function App() {
               </span>
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActivityOpen(false);
+              setDomain(undefined);
+              setPage("pdf_editor");
+            }}
+            className={navClass(page === "pdf_editor")}
+          >
+            <span className={navIcon(page === "pdf_editor")}><PenTool size={16} /></span> Editar PDF
+          </button>
           <p className="px-3 pb-1 pt-6 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">
             Dominios
           </p>
@@ -206,6 +219,7 @@ export default function App() {
           />
         )}
         {page === "history" && <HistoryView onBack={() => goHome()} />}
+        {page === "pdf_editor" && <PdfEditorView />}
       </main>
 
       <ActivityDrawer open={activityOpen} onClose={() => setActivityOpen(false)} onViewDocling={openDoclingResult} onOpenHistory={openHistory} />

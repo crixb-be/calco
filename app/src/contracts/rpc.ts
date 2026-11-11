@@ -25,6 +25,15 @@ export interface PdfPagesMetadataParams {
   password?: string;
 }
 
+export interface ReadPdfBytesParams {
+  path: string;
+}
+
+export interface ReadPdfBytesResult {
+  data: string;
+  size: number;
+}
+
 export type ThumbnailTier = "S" | "M" | "L" | "XL";
 
 export interface PdfPagesMetadataResult {
@@ -114,6 +123,10 @@ export interface RpcContracts {
   get_pdf_pages_metadata: {
     params: PdfPagesMetadataParams;
     result: PdfPagesMetadataResult;
+  };
+  read_pdf_bytes: {
+    params: ReadPdfBytesParams;
+    result: ReadPdfBytesResult;
   };
   get_page_thumbnails: {
     params: PageThumbnailsParams;

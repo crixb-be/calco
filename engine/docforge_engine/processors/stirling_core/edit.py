@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -19,8 +20,116 @@ PRESETS = {
 }
 
 
+def _annotation_number(value, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise EngineError("INVALID_TASK", f"{name} debe ser un número finito")
+    return float(value)
+
+
+def _annotation_color(value, name: str = "color") -> tuple[float, float, float]:
+    if not isinstance(value, str) or re.fullmatch(r"#[0-9a-fA-F]{6}", value) is None:
+        raise EngineError("INVALID_TASK", f"{name} debe tener formato #rrggbb")
+    return tuple(int(value[index:index + 2], 16) / 255 for index in (1, 3, 5))
+
+
 class PdfEditProcessor(BaseProcessor):
     engine_name = "stirling_core"
+
+    @action()
+    def apply_annotations(self, task, reporter):
+        fitz = fitz_module()
+        source = one_input(task)
+        annotations = task.options.get("annotations", [])
+        if not isinstance(annotations, list):
+            raise EngineError("INVALID_TASK", "annotations debe ser una lista")
+        if len(annotations) > 5000:
+            raise EngineError("INVALID_TASK", "No se permiten más de 5000 anotaciones")
+        doc = open_pdf(fitz, source)
+        try:
+            per_page: dict[int, list[dict]] = {index: [] for index in range(len(doc))}
+            for index, annotation in enumerate(annotations):
+                if not isinstance(annotation, dict):
+                    raise EngineError("INVALID_TASK", f"Anotación {index + 1} inválida")
+                page_number = annotation.get("page")
+                if isinstance(page_number, bool) or not isinstance(page_number, int) or not 0 <= page_number < len(doc):
+                    raise EngineError("INVALID_TASK", f"Página inválida en la anotación {index + 1}")
+                kind = annotation.get("kind")
+                if kind == "text":
+                    if not isinstance(annotation.get("text"), str):
+                        raise EngineError("INVALID_TASK", f"Texto inválido en la anotación {index + 1}")
+                    item = {
+                        "kind": kind,
+                        "x": _annotation_number(annotation.get("x"), "x"),
+                        "y": _annotation_number(annotation.get("y"), "y"),
+                        "size": _annotation_number(annotation.get("size"), "size"),
+                        "color": _annotation_color(annotation.get("color")),
+                        "text": annotation["text"],
+                    }
+                    if item["size"] <= 0:
+                        raise EngineError("INVALID_TASK", "size debe ser mayor que cero")
+                elif kind == "ink":
+                    raw_points = annotation.get("points")
+                    if not isinstance(raw_points, list) or len(raw_points) < 2:
+                        raise EngineError("INVALID_TASK", f"Trazo inválido en la anotación {index + 1}")
+                    points = []
+                    for point in raw_points:
+                        if not isinstance(point, (list, tuple)) or len(point) != 2:
+                            raise EngineError("INVALID_TASK", f"Punto inválido en la anotación {index + 1}")
+                        points.append((_annotation_number(point[0], "x"), _annotation_number(point[1], "y")))
+                    width = _annotation_number(annotation.get("width"), "width")
+                    if width <= 0:
+                        raise EngineError("INVALID_TASK", "width debe ser mayor que cero")
+                    item = {"kind": kind, "points": points, "width": width, "color": _annotation_color(annotation.get("color"))}
+                elif kind == "highlight":
+                    width = _annotation_number(annotation.get("w"), "w")
+                    height = _annotation_number(annotation.get("h"), "h")
+                    if width < 0 or height < 0:
+                        raise EngineError("INVALID_TASK", "El resaltado debe tener tamaño positivo")
+                    item = {
+                        "kind": kind,
+                        "x": _annotation_number(annotation.get("x"), "x"),
+                        "y": _annotation_number(annotation.get("y"), "y"),
+                        "w": width,
+                        "h": height,
+                        "color": _annotation_color(annotation.get("color")),
+                    }
+                else:
+                    raise EngineError("INVALID_TASK", f"Tipo de anotación no soportado: {kind}")
+                per_page[page_number].append(item)
+
+            def display_point(page, x: float, y: float):
+                # The UI stores PDF.js viewport coordinates (top-left, rotated page space).
+                # PyMuPDF's derotation matrix maps them back to the page's PDF coordinates.
+                return fitz.Point(x, y) * page.derotation_matrix
+
+            for number, page in enumerate(doc):
+                reporter.check_cancelled()
+                for annotation in per_page[number]:
+                    color = annotation["color"]
+                    if annotation["kind"] == "text":
+                        size = annotation["size"]
+                        for line_number, line in enumerate(annotation["text"].split("\n")):
+                            # Helvetica is intentionally used here; non-Latin text needs an embedded font.
+                            point = display_point(page, annotation["x"], annotation["y"] + size + line_number * size * 1.2)
+                            page.insert_text(point, line, fontsize=size, color=color, fontname="helv", overlay=True)
+                    elif annotation["kind"] == "ink":
+                        points = [display_point(page, x, y) for x, y in annotation["points"]]
+                        page.draw_polyline(points, color=color, width=annotation["width"], lineCap=1, lineJoin=1, closePath=False, overlay=True)
+                    else:
+                        corners = [
+                            display_point(page, annotation["x"], annotation["y"]),
+                            display_point(page, annotation["x"] + annotation["w"], annotation["y"]),
+                            display_point(page, annotation["x"] + annotation["w"], annotation["y"] + annotation["h"]),
+                            display_point(page, annotation["x"], annotation["y"] + annotation["h"]),
+                        ]
+                        rect = fitz.Rect(min(point.x for point in corners), min(point.y for point in corners), max(point.x for point in corners), max(point.y for point in corners))
+                        page.draw_rect(rect, color=None, fill=color, fill_opacity=0.35, overlay=True)
+                reporter.report((number + 1) * 100 / len(doc), f"Editada página {number + 1}")
+            out = output_path(task, safe_stem(source), "editado", ".pdf")
+            atomic_save(out, lambda temp: doc.save(temp, garbage=3, deflate=True))
+            return [str(out)], {"pages": len(doc), "annotations": len(annotations)}
+        finally:
+            doc.close()
 
     @action()
     def redact(self, task, reporter):

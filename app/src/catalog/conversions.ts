@@ -2,14 +2,15 @@ import type { Engine } from "@/contracts/task";
 
 /** Universal converter routing: complete Office/PDF/image conversion matrix. */
 
-export type TargetFormat = "pdf" | "docx" | "xlsx" | "html" | "png" | "jpg" | "webp";
-export type InputFamily = "office" | "image" | "pdf";
+export type TargetFormat = "pdf" | "docx" | "xlsx" | "html" | "md" | "png" | "jpg" | "webp";
+export type InputFamily = "office" | "image" | "pdf" | "text";
 
 export const TARGETS: { id: TargetFormat; label: string }[] = [
   { id: "pdf", label: "PDF" },
   { id: "docx", label: "DOCX" },
   { id: "xlsx", label: "XLSX" },
   { id: "html", label: "HTML" },
+  { id: "md", label: "Markdown" },
   { id: "png", label: "PNG" },
   { id: "jpg", label: "JPG" },
   { id: "webp", label: "WebP" },
@@ -19,18 +20,22 @@ const FAMILY_EXTENSIONS: Record<InputFamily, string[]> = {
   office: ["docx", "doc", "xlsx", "xls", "pptx", "ppt", "odt", "ods", "odp", "rtf", "csv"],
   image: ["png", "jpg", "jpeg", "webp", "tiff", "tif", "bmp"],
   pdf: ["pdf"],
+  text: ["txt", "html", "htm"],
 };
 
 export const CONVERTER_EXTENSIONS = Object.values(FAMILY_EXTENSIONS).flat();
 
-const FAMILY_LABEL: Record<InputFamily, string> = { office: "documentos de oficina", image: "imágenes", pdf: "PDF" };
+const FAMILY_LABEL: Record<InputFamily, string> = { office: "documentos de oficina", image: "imágenes", pdf: "PDF", text: "texto / HTML" };
 
 /** Targets each family can reach. */
 const ROUTES: Record<InputFamily, TargetFormat[]> = {
-  office: ["pdf"],
+  office: ["pdf", "md"],
   image: ["pdf", "png", "jpg", "webp"],
-  pdf: ["docx", "xlsx", "html", "png", "jpg", "webp"],
+  pdf: ["docx", "xlsx", "html", "md", "png", "jpg", "webp"],
+  text: ["md"],
 };
+
+const MARKDOWN_OFFICE_EXTENSIONS = new Set(["docx", "pptx", "xlsx"]);
 
 export const IMAGE_TARGETS = new Set<TargetFormat>(["png", "jpg", "webp"]);
 
@@ -80,6 +85,9 @@ export function availableTargets(files: string[]): TargetAvailability[] {
     if (!ROUTES[family].includes(id)) {
       return { target: id, enabled: false, reason: `No disponible para ${FAMILY_LABEL[family]}` };
     }
+    if (id === "md" && family === "office" && files.some((file) => !MARKDOWN_OFFICE_EXTENSIONS.has(extensionOf(file)))) {
+      return { target: id, enabled: false, reason: "Markdown solo admite DOCX, PPTX y XLSX" };
+    }
     if (family === "image" && files.every((file) => sameFormat(extensionOf(file)) === id)) {
       return { target: id, enabled: false, reason: `Los archivos ya son ${id.toUpperCase()}` };
     }
@@ -117,6 +125,9 @@ export function planConversion(files: string[], target: TargetFormat, opts: Conv
   if (!ROUTES[family].includes(target)) {
     return { error: `No se puede convertir ${FAMILY_LABEL[family]} a ${target.toUpperCase()}.` };
   }
+  if (target === "md" && family === "office" && files.some((file) => !MARKDOWN_OFFICE_EXTENSIONS.has(extensionOf(file)))) {
+    return { error: "Markdown solo admite DOCX, PPTX y XLSX" };
+  }
   if (family === "image" && files.every((file) => sameFormat(extensionOf(file)) === target)) {
     return { error: `Los archivos ya están en ${target.toUpperCase()}.` };
   }
@@ -126,7 +137,9 @@ export function planConversion(files: string[], target: TargetFormat, opts: Conv
     files.map((file) => ({ engine, action, inputFiles: [file], options }));
 
   let tasks: PlannedTask[];
-  if (family === "office") {
+  if (target === "md") {
+    tasks = perFile("docling_core", "to_markdown", {});
+  } else if (family === "office") {
     tasks = [{ engine: "office_bridge", action: "office_to_pdf", inputFiles: files, options: office }];
   } else if (family === "image" && IMAGE_TARGETS.has(target)) {
     // One batch task: the engine reports progress per image.

@@ -1,16 +1,144 @@
 from __future__ import annotations
 
 import contextlib
+from html.parser import HTMLParser
 import importlib.util
 import json
 import os
 import re
+import tempfile
+from types import SimpleNamespace
 from pathlib import Path
 
 from ...base import BaseProcessor, action
 from ...errors import EngineError
 from ...util.pages import page_ranges
 from ...util.paths import atomic_write_bytes, output_path, require_inputs, safe_stem
+
+
+class _HtmlMarkdownParser(HTMLParser):
+    """Small dependency-free HTML subset used by the lite sidecar."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.blocks: list[str] = []
+        self.text = ""
+        self.skip = 0
+        self.heading = False
+        self.list_stack: list[tuple[str, int]] = []
+        self.table_rows: list[list[str]] = []
+        self.row: list[str] | None = None
+        self.cell: list[str] | None = None
+        self.link_href: str | None = None
+
+    def _write(self, value: str) -> None:
+        if self.cell is not None:
+            self.cell.append(value)
+        else:
+            self.text += value
+
+    def _flush(self) -> None:
+        value = re.sub(r"[ \t]+", " ", self.text).strip()
+        if value:
+            self.blocks.append(value)
+        self.text = ""
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        tag = tag.lower()
+        if tag in {"script", "style"}:
+            self.skip += 1
+            return
+        if self.skip:
+            return
+        attrs_map = dict(attrs)
+        if tag in {"p", "div", "section", "article", "header", "footer"}:
+            self._flush()
+        elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            self._flush()
+            self.text = "#" * int(tag[1]) + " "
+            self.heading = True
+        elif tag == "br":
+            self._write("\n")
+        elif tag in {"strong", "b"}:
+            self._write("**")
+        elif tag in {"em", "i"}:
+            self._write("*")
+        elif tag == "a":
+            self.link_href = attrs_map.get("href")
+            if self.link_href:
+                self._write("[")
+        elif tag in {"ul", "ol"}:
+            self._flush()
+            self.list_stack.append((tag, 0))
+        elif tag == "li":
+            self._flush()
+            if self.list_stack:
+                kind, count = self.list_stack[-1]
+                count += 1
+                self.list_stack[-1] = (kind, count)
+                self.text = f"{count}. " if kind == "ol" else "- "
+        elif tag == "table":
+            self._flush()
+            self.table_rows = []
+        elif tag == "tr":
+            self.row = []
+        elif tag in {"td", "th"} and self.row is not None:
+            self.cell = []
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in {"script", "style"}:
+            self.skip = max(0, self.skip - 1)
+            return
+        if self.skip:
+            return
+        if tag in {"p", "div", "section", "article", "header", "footer", "li"}:
+            self._flush()
+        elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            self._flush()
+            self.heading = False
+        elif tag in {"ul", "ol"}:
+            self._flush()
+            if self.list_stack:
+                self.list_stack.pop()
+        elif tag in {"strong", "b"}:
+            self._write("**")
+        elif tag in {"em", "i"}:
+            self._write("*")
+        elif tag == "a" and self.link_href:
+            self._write(f"]({self.link_href})")
+            self.link_href = None
+        elif tag in {"td", "th"} and self.row is not None and self.cell is not None:
+            self.row.append(re.sub(r"\s+", " ", "".join(self.cell)).strip())
+            self.cell = None
+        elif tag == "tr" and self.row is not None:
+            if self.row:
+                self.table_rows.append(self.row)
+            self.row = None
+        elif tag == "table":
+            if self.table_rows:
+                rows = [[cell.replace("|", "\\|") for cell in row] for row in self.table_rows]
+                width = max(len(row) for row in rows)
+                rows = [row + [""] * (width - len(row)) for row in rows]
+                table = ["| " + " | ".join(rows[0]) + " |", "| " + " | ".join("---" for _ in range(width)) + " |"]
+                table.extend("| " + " | ".join(row) + " |" for row in rows[1:])
+                self.blocks.append("\n".join(table))
+            self.table_rows = []
+
+    def handle_data(self, data: str) -> None:
+        if not self.skip:
+            self._write(re.sub(r"\s+", " ", data))
+
+    def markdown(self) -> str:
+        self._flush()
+        return "\n\n".join(block for block in self.blocks if block).strip() + "\n"
+
+
+def html_to_markdown(content: str) -> str:
+    parser = _HtmlMarkdownParser()
+    parser.feed(content)
+    parser.close()
+    return parser.markdown()
 
 
 def _load_docling():
@@ -198,6 +326,73 @@ class DoclingProcessor(BaseProcessor):
         self._ensure_models(reporter, groups, 10, 99, artifacts)
         reporter.report(100, "Completado")
         return [], {"artifactsPath": str(artifacts)}
+
+    @staticmethod
+    def _docling_markdown(source: Path) -> str | None:
+        try:
+            from docling.document_converter import DocumentConverter
+        except ImportError:
+            return None
+        result = DocumentConverter().convert(str(source))
+        return result.document.export_to_markdown()
+
+    @staticmethod
+    def _office_pdf(source: Path, task, reporter, temp_dir: Path) -> Path:
+        from ...util.office_engines import convert_office_to_pdf
+
+        temporary_task = SimpleNamespace(inputFiles=[str(source)], outputDir=str(temp_dir), options=dict(task.options))
+        return Path(convert_office_to_pdf(temporary_task, reporter)[0][0])
+
+    @action()
+    def to_markdown(self, task, reporter):
+        """Convert supported text, Office and PDF inputs to Markdown."""
+        inputs = [path.resolve() for path in require_inputs(task)]
+        supported = {".pdf", ".docx", ".pptx", ".xlsx", ".html", ".htm", ".txt"}
+        outputs: list[str] = []
+        total = len(inputs)
+        for index, source in enumerate(inputs):
+            reporter.check_cancelled()
+            extension = source.suffix.lower()
+            if extension not in supported:
+                raise EngineError("INVALID_TASK", f"Formato no soportado para Markdown: {source.suffix or '(sin extensión)'}")
+            reporter.report(index * 100 / total, f"Convirtiendo {source.name} a Markdown")
+            if extension == ".txt":
+                reporter.log(f"Markdown desde texto plano: {source.name}")
+                content = source.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+            elif extension in {".html", ".htm"}:
+                content = self._docling_markdown(source)
+                if content is not None:
+                    reporter.log(f"Markdown mediante Docling: {source.name}")
+                else:
+                    reporter.log(f"Markdown mediante conversor HTML integrado: {source.name}")
+                    content = html_to_markdown(source.read_text(encoding="utf-8", errors="replace"))
+            elif extension == ".pdf":
+                try:
+                    import pymupdf4llm
+                except ImportError as exc:
+                    raise EngineError("DEPENDENCY_MISSING", "pymupdf4llm es necesario para convertir PDF a Markdown", str(exc)) from exc
+                reporter.log(f"Markdown mediante pymupdf4llm: {source.name}")
+                content = str(pymupdf4llm.to_markdown(str(source)))
+            else:
+                content = self._docling_markdown(source)
+                if content is not None:
+                    reporter.log(f"Markdown mediante Docling: {source.name}")
+                else:
+                    reporter.log(f"Docling no está disponible; se usará Office + pymupdf4llm para {source.name}")
+                    try:
+                        import pymupdf4llm
+                    except ImportError as exc:
+                        raise EngineError("DEPENDENCY_MISSING", "pymupdf4llm es necesario para convertir Office a Markdown", str(exc)) from exc
+                    with tempfile.TemporaryDirectory(prefix="docforge-markdown-") as temporary:
+                        pdf = self._office_pdf(source, task, reporter, Path(temporary))
+                        reporter.check_cancelled()
+                        content = str(pymupdf4llm.to_markdown(str(pdf)))
+            reporter.check_cancelled()
+            out = output_path(task, safe_stem(source), "to_markdown", ".md", index if total > 1 else None).resolve()
+            atomic_write_bytes(out, content.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8"))
+            outputs.append(str(out))
+            reporter.report((index + 1) * 100 / total, f"Convertido {source.name}")
+        return outputs, {"format": "md", "count": len(outputs)}
 
     @staticmethod
     def _page_count(source: Path) -> int | None:

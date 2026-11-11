@@ -108,7 +108,7 @@ export function useOutputDir(category: OutputCategory | null) {
 
 export function categoryForTarget(target: TargetFormat): OutputCategory {
   if (target === "pdf") return "pdf";
-  if (target === "docx" || target === "xlsx" || target === "html") return "office";
+  if (target === "docx" || target === "xlsx" || target === "html" || target === "md") return "office";
   return "image";
 }
 

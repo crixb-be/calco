@@ -70,7 +70,8 @@ def main(argv: list[str] | None = None) -> int:
         "--distpath", str(engine_root / "dist"), "--workpath", str(build_root),
         "--specpath", str(build_root),
         "--collect-binaries", "pymupdf", "--collect-data", "pymupdf",
-        "--hidden-import", "pymupdf", "--hidden-import", "win32com.client",
+        "--hidden-import", "pymupdf", "--hidden-import", "pymupdf4llm", "--collect-submodules", "pymupdf4llm",
+        "--hidden-import", "win32com.client",
         "--hidden-import", "pythoncom", "--hidden-import", "pywintypes", "--hidden-import", "win32timezone",
         "--collect-submodules", "win32com",
     ]

@@ -5,6 +5,7 @@ Each method takes a params dict and returns a JSON-serialisable dict, or raises 
 """
 from __future__ import annotations
 
+import base64
 import os
 import shutil
 import tempfile
@@ -20,6 +21,7 @@ from .storage.history_manager import get_history_manager
 READABLE_EXTENSIONS = {".md", ".json", ".html", ".htm", ".txt", ".doctags"}
 DEFAULT_MAX_BYTES = 20 * 1024 * 1024
 MAX_READ_BYTES = 50 * 1024 * 1024
+MAX_PDF_BYTES = 200 * 1024 * 1024
 EXPORT_EXTENSIONS = READABLE_EXTENSIONS | {".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg", ".webp"}
 
 RpcMethod = Callable[[dict[str, Any]], dict[str, Any]]
@@ -58,6 +60,17 @@ def _int(params: dict[str, Any], key: str, default: int) -> int:
 def get_pdf_pages_metadata(params: dict[str, Any]) -> dict[str, Any]:
     pdf = _abs_path(params, "pdfPath")
     return get_service().metadata(str(pdf), params.get("password"))
+
+
+@rpc_method("read_pdf_bytes")
+def read_pdf_bytes(params: dict[str, Any]) -> dict[str, Any]:
+    pdf = _abs_path(params, "path")
+    if pdf.suffix.lower() != ".pdf":
+        raise EngineError("INVALID_TASK", "El archivo debe tener extensión .pdf")
+    size = pdf.stat().st_size
+    if size > MAX_PDF_BYTES:
+        raise EngineError("INVALID_TASK", f"El PDF supera el límite de 200 MB ({size} bytes)")
+    return {"data": base64.b64encode(pdf.read_bytes()).decode("ascii"), "size": size}
 
 
 @rpc_method("get_page_thumbnails")
