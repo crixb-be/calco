@@ -8,8 +8,8 @@ jobs:
   engine:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install -e "engine[pdf,dev]"
@@ -19,8 +19,8 @@ jobs:
   app:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - uses: dtolnay/rust-toolchain@stable
@@ -28,5 +28,9 @@ jobs:
         working-directory: app
       - run: npx tsc --noEmit -p .
         working-directory: app
+      - name: Crear sidecar de relleno para cargo check
+        run: New-Item -ItemType File -Force binaries/docforge-engine-x86_64-pc-windows-msvc.exe
+        working-directory: app/src-tauri
+        shell: pwsh
       - run: cargo check
         working-directory: app/src-tauri
