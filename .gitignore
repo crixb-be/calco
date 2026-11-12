@@ -1,17 +1,43 @@
-.pytest-tmp/
-**/.pytest-tmp/
-**/__pycache__/
-engine/build/
-engine/dist/
-engine/*.spec
-engine/.pytest_cache/
-app/node_modules/
-app/dist/
-app/src-tauri/target/
-app/src-tauri/binaries/docforge-engine*
+# ── Dependencias y entornos ─────────────────────────────
+node_modules/
+.venv/
+venv/
 .npm-cache/
-dist/
-engine/.venv/
-**/.venv/
 *.egg-info/
+
+# ── Compilados y artefactos de build ────────────────────
+dist/
+build/
+target/
+*.tsbuildinfo
+tsconfig.app.tsbuildinfo
+
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.pytest-tmp/
+# Los .spec los genera PyInstaller desde engine/build_sidecar.py
+*.spec
+
+# ── Binarios / instaladores ─────────────────────────────
+*.exe
+*.msi
+*.dll
+*.so
+*.dylib
+
+# ── Sidecar compilado (se genera con build_sidecar.py) ──
+app/src-tauri/binaries/*
+!app/src-tauri/binaries/README.md
+!app/src-tauri/binaries/.gitkeep
+
+# ── Entorno y sistema ───────────────────────────────────
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# ── Archivos locales de prueba ──────────────────────────
 Pruebas/

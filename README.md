@@ -1,51 +1,196 @@
-# DocForge
+<div align="center">
 
-DocForge es una suite documental local: la interfaz Tauri v2 + React vive en
-`app/` y el motor Python offline vive en `engine/`.
+<img src="app/src-tauri/icons/128x128.png" alt="Logo de CALCO" width="110" />
 
-## Puesta en marcha
+# CALCO
 
-Requisitos: Node 26, Rust 1.99, Python 3.12 y `uv`.
+**Suite local y privada para PDF, conversión universal, Markdown para IA y multimedia.**
 
+Edita, convierte y optimiza tus documentos **sin subir un solo archivo a la nube**.
+Todo se procesa en tu equipo.
+
+[![Versión](https://img.shields.io/badge/versión-0.1.2-6366f1?style=for-the-badge)](https://github.com/crixb-be/calco/releases)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-22c55e?style=for-the-badge)](LICENSE)
+
+![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
+![PyMuPDF](https://img.shields.io/badge/PyMuPDF-PDF%20engine-c0392b?style=flat-square)
+![MIT License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+
+[Características](#-características) ·
+[Arquitectura](#-arquitectura) ·
+[Instalación](#-instalación-y-desarrollo-local) ·
+[Descargas](https://github.com/crixb-be/calco/releases) ·
+[Autor](#-autor)
+
+</div>
+
+---
+
+## ✨ ¿Qué es CALCO?
+
+CALCO es una aplicación de escritorio que reúne en un solo lugar las herramientas
+que normalmente se buscan en webs de terceros: editar PDF, unirlos, comprimirlos,
+convertir documentos de Office, extraer Markdown limpio para alimentar modelos de
+IA o convertir audio y video.
+
+La diferencia: **tus archivos nunca salen de tu computadora**. No hay servidores,
+no hay cuentas, no hay límites de tamaño impuestos por un servicio en línea.
+
+| 🔒 Privacidad total | ⚡ Rendimiento nativo | 🧩 Todo en uno |
+| :---: | :---: | :---: |
+| Procesamiento 100 % local, funciona sin conexión | Interfaz Tauri + Rust y motor Python optimizado | PDF, Office, imágenes, Markdown y multimedia |
+
+---
+
+## 🚀 Características
+
+### ✍️ Editor PDF interactivo
+- **Texto multilínea** con estilos personalizables.
+- **Inserción de imágenes y firmas** sobre cualquier página.
+- **Dibujo libre** a mano alzada.
+- **Resaltador** para marcar fragmentos importantes.
+- **Formas geométricas** (rectángulos, elipses, líneas, flechas).
+
+### 🛠️ Herramientas PDF
+| Organizar | Optimizar | Seguridad | Extras |
+| --- | --- | --- | --- |
+| Unir | Comprimir | Proteger con contraseña | Marcas de agua |
+| Dividir | Rotar | Desbloquear | Numeración de páginas |
+| Reordenar páginas | Recortar | | Extracción de imágenes |
+
+### 🔄 Conversor universal y Markdown para IA
+- Conversión entre **PDF ⇄ Office** (`DOCX`, `XLSX`, `PPTX`) e **imágenes** (`PNG`, `JPG`, …).
+- Motores de Office en cascada: **Microsoft Office** (vía COM, invisible) → **LibreOffice** → aviso con alternativas.
+- Extracción limpia de PDF a **`.md`** con **`PyMuPDF4LLM`**, ideal para usar como contexto en ChatGPT, Claude u otros LLM.
+
+### 🎬 Multimedia
+- **Conversión y compresión local de audio y video** con **FFmpeg**.
+- FFmpeg es opcional: se detecta en el `PATH` o en la ruta que configures desde *Ajustes*.
+
+---
+
+## 🏗️ Arquitectura
+
+```
+┌──────────────────────────────────────────────┐
+│  Frontend · React + TypeScript + Tailwind     │  app/src
+│  (interfaz, editor PDF, historial)            │
+└───────────────────────┬──────────────────────┘
+                        │ invoke()
+┌───────────────────────▼──────────────────────┐
+│  Núcleo Tauri v2 · Rust                       │  app/src-tauri
+│  (ventana nativa, diálogos, gestión sidecar)  │
+└───────────────────────┬──────────────────────┘
+                        │ JSON-RPC (stdin/stdout)
+┌───────────────────────▼──────────────────────┐
+│  Sidecar Python · docforge_engine             │  engine/
+│  PyMuPDF · pikepdf · pypdf · Pillow ·         │
+│  PyMuPDF4LLM · Office COM · LibreOffice ·     │
+│  FFmpeg                                       │
+└──────────────────────────────────────────────┘
+```
+
+| Carpeta | Contenido |
+| --- | --- |
+| `app/` | Interfaz React + Vite y proyecto Tauri (`src-tauri/`). |
+| `app/src-tauri/binaries/` | Destino del sidecar compilado (no se versiona). |
+| `engine/` | Motor Python: procesadores PDF, conversores, puente Office/FFmpeg y pruebas. |
+| `scripts/` | Scripts de empaquetado y verificación de la distribución. |
+
+Más detalles en [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+---
+
+## 💻 Instalación y desarrollo local
+
+### Requisitos
+- **Node.js** 20 o superior y **npm**
+- **Rust** (stable) + requisitos de [Tauri v2](https://v2.tauri.app/start/prerequisites/)
+- **Python 3.12** (se recomienda [`uv`](https://docs.astral.sh/uv/))
+- *Opcional:* Microsoft Office o LibreOffice (conversiones Office) y FFmpeg (multimedia)
+
+### 1. Clonar el repositorio
+```powershell
+git clone https://github.com/crixb-be/calco.git
+cd calco
+```
+
+### 2. Entorno virtual de Python (motor)
 ```powershell
 cd engine
 uv venv --python 3.12
-# instala las dependencias del engine según pyproject.toml y sus extras
-
-cd ..\app
-npm install
-npm run tauri dev
-npm run tauri:dev
+uv pip install -e ".[pdf,office,dev]"
+# Opcional (pesado): soporte Docling
+# uv pip install -e ".[docling]"
+cd ..
 ```
 
-En desarrollo, DocForge arranca `engine/.venv/Scripts/python.exe -m
-docforge_engine serve` (en macOS/Linux usa `.venv/bin/python`) cuando no hay
-sidecar compilado. Para construirlo, ejecuta `python engine/build_sidecar.py` y
-deja el binario generado en `app/src-tauri/binaries/`; luego usa el flujo de
-empaquetado de Tauri.
+<details>
+<summary>Sin <code>uv</code> (venv estándar)</summary>
 
-## Conversión de Office a PDF
+```powershell
+cd engine
+py -3.12 -m venv .venv
+.\.venv\Scripts\activate
+pip install -e ".[pdf,office,dev]"
+cd ..
+```
+</details>
 
-LibreOffice ya **no es obligatorio**. Para convertir documentos Office a PDF,
-DocForge prueba los motores en cascada:
+### 3. Compilar el sidecar (versión `--lite`)
+Genera el ejecutable del motor sin Docling/Torch y lo copia automáticamente en
+`app/src-tauri/binaries/` con el sufijo del target de Tauri:
 
-1. **Microsoft Office** (Word, Excel o PowerPoint según el archivo), si está
-   instalado. Se usa por COM en una instancia propia e invisible, sin tocar los
-   documentos que tengas abiertos.
-2. **LibreOffice**, si Office no está o no puede abrir el archivo. Se busca en
-   la ruta de Ajustes, `DOCFORGE_SOFFICE`, `PATH`, Program Files, AppData,
-   LibreOffice Portable, Scoop, Chocolatey y el registro de Windows.
-3. Si no hay ninguno, la tarea muestra las alternativas disponibles.
+```powershell
+engine\.venv\Scripts\python.exe engine\build_sidecar.py --lite
+```
 
-La opción de tarea `officeEngine` (`auto` por defecto, `msoffice` o
-`libreoffice`) fuerza un motor concreto. La variable de entorno
-`DOCFORGE_DISABLE_OFFICE_COM=1` desactiva Microsoft Office (la usan las pruebas).
+> En desarrollo este paso es opcional: si no hay sidecar compilado, CALCO arranca
+> el motor directamente desde `engine/.venv`.
 
-FFmpeg tampoco se embebe: es opcional y se busca en `PATH` o en la ruta que
-guardes desde Ajustes. Docling usa modelos locales después del prefetch inicial.
+### 4. Ejecutar en modo desarrollo
+```powershell
+cd app
+npm install
+npm run dev          # solo la interfaz web (Vite)
+npm run tauri dev    # aplicación de escritorio completa
+```
 
-## Sidecar
+### 5. Generar el instalador
+```powershell
+cd app
+npm run tauri build
+```
+El instalador NSIS queda en `app/src-tauri/target/release/bundle/nsis/`
+(por ejemplo `CALCO_0.1.2_x64-setup.exe`).
 
-`python engine/build_sidecar.py --lite` genera el sidecar sin Docling/Torch y
-con optimización de bytecode `-OO` por defecto. La build completa usa `-O0`
-salvo que pases `--optimize 2`. `--upx` activa la compresión UPX (opcional).
+### Pruebas del motor
+```powershell
+cd engine
+.\.venv\Scripts\python.exe -m pytest
+```
+
+---
+
+## 📦 Descargas
+
+¿Solo quieres usarlo? Descarga el instalador para Windows desde la pestaña
+[**Releases**](https://github.com/crixb-be/calco/releases).
+
+---
+
+## 👤 Autor
+
+**Cristian Billy Bustamante Espinoza** — [@crixb-be](https://github.com/crixb-be)
+
+Si CALCO te resulta útil, ¡deja una ⭐ en el repositorio!
+
+---
+
+## 📄 Licencia
+
+Distribuido bajo la licencia **MIT**. Consulta el archivo [`LICENSE`](LICENSE) para más información.
