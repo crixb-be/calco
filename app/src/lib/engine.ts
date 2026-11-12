@@ -33,7 +33,7 @@ function rpcError(error: unknown): EngineRpcError {
 }
 
 export async function runTask(task: ProcessorTask) {
-  if (!tauriAvailable()) throw new Error("DocForge necesita ejecutarse con Tauri para procesar archivos.");
+  if (!tauriAvailable()) throw new Error("CALCO necesita ejecutarse con Tauri para procesar archivos.");
   return invoke<ProcessorTask>("run_task", { task });
 }
 

@@ -13,7 +13,7 @@ const DEVELOPER = {
   initials: "CB",
   avatar: "https://github.com/crixb-be.png",
   github: "https://github.com/crixb-be",
-  repository: "https://github.com/crixb-be/docforge-desktop",
+  repository: "https://github.com/crixb-be/calco",
   license: "MIT",
   instagram: "https://www.instagram.com/cristhian.billy/",
   facebook: "https://www.facebook.com/cristhian.bustamanteespinoza/",
@@ -39,13 +39,7 @@ export default function DeveloperView() {
     openUrl(url).catch(() => showToast("error", "No se pudo abrir el enlace en el navegador."));
   };
 
-  const contactByEmail = () => {
-    // Copia la dirección (útil si no hay cliente de correo) y abre el cliente predeterminado.
-    navigator.clipboard?.writeText(DEVELOPER.email)
-      .then(() => showToast("success", `Correo copiado: ${DEVELOPER.email}`))
-      .catch(() => showToast("success", DEVELOPER.email));
-    open(`mailto:${DEVELOPER.email}`);
-  };
+  const contactByEmail = () => open(`mailto:${DEVELOPER.email}`);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6 lg:p-8">
@@ -101,7 +95,7 @@ export default function DeveloperView() {
               onClick={() => open(DEVELOPER.github)}
               className="inline-flex h-10 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90"
             >
-              <Github size={16} /> Ver perfil en GitHub
+              <Github size={16} /> GitHub
             </button>
             {SOCIALS.map(({ key, label, icon: Icon }) => (
               <button
@@ -116,11 +110,11 @@ export default function DeveloperView() {
             ))}
             <button
               type="button"
-              title={`Escribir a ${DEVELOPER.email} (se copia al portapapeles)`}
+              title={`Escribir a ${DEVELOPER.email}`}
               onClick={contactByEmail}
               className="inline-flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-4 text-sm font-semibold transition-colors hover:bg-accent"
             >
-              <Mail size={16} /> {DEVELOPER.email}
+              <Mail size={16} /> Correo
             </button>
           </div>
 

@@ -1,8 +1,8 @@
 [package]
-name = "docforge-desktop"
+name = "calco"
 version = "0.1.2"
-description = "DocForge Desktop"
-authors = ["DocForge"]
+description = "CALCO"
+authors = ["CALCO"]
 edition = "2021"
 rust-version = "1.77"
 

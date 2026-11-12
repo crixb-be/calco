@@ -88,7 +88,7 @@ export default function UniversalConverter({ onOpenActivity }: Props) {
           <p className="eyebrow">Conversor Universal</p>
           <h1 className="text-xl font-bold">Convertir archivos</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Arrastra documentos de oficina, imágenes o PDF y elige el formato de destino. DocForge elige el motor adecuado.
+            Arrastra documentos de oficina, imágenes o PDF y elige el formato de destino. CALCO elige el motor adecuado.
           </p>
         </div>
       </div>

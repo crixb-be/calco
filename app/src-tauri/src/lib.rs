@@ -23,5 +23,5 @@ pub fn run() {
             commands::notify_desktop
         ])
         .run(tauri::generate_context!())
-        .expect("error while running DocForge Desktop");
+        .expect("error while running CALCO");
 }

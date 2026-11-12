@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos mínimos para la aplicación de escritorio DocForge.",
+  "description": "Permisos mínimos para la aplicación de escritorio CALCO.",
   "windows": ["main"],
   "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save", "opener:default"]
 }

@@ -193,7 +193,7 @@ export default function ToolPage({
       <Card className="space-y-4 p-5">
         <div className="flex items-center gap-2 rounded-md border border-blue-800/40 bg-blue-950/40 px-3 py-2 text-xs text-blue-200">
           <Info className="h-4 w-4 shrink-0" />
-          <span>{selectedTool.tip ?? "Puedes seguir usando DocForge mientras el trabajo corre en segundo plano."}</span>
+          <span>{selectedTool.tip ?? "Puedes seguir usando CALCO mientras el trabajo corre en segundo plano."}</span>
         </div>
 
         <FileDrop

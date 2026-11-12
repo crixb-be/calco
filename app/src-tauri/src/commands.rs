@@ -108,6 +108,7 @@ fn settings_path() -> PathBuf {
     let root = env::var_os("APPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    // Carpeta heredada del nombre anterior (DocForge): se conserva para no perder los ajustes guardados.
     root.join("DocForge").join("settings.json")
 }
 
@@ -215,7 +216,7 @@ $xml.LoadXml('<toast><visual><binding template="ToastGeneric"><text id="1"></tex
 $xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode($env:DOCFORGE_NOTIFICATION_TITLE)) | Out-Null
 $xml.GetElementsByTagName('text')[1].AppendChild($xml.CreateTextNode($env:DOCFORGE_NOTIFICATION_BODY)) | Out-Null
 $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('DocForge Desktop').Show($toast)
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('CALCO').Show($toast)
 "#;
         let mut ps = std::process::Command::new("powershell.exe");
         ps.args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script])

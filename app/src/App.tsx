@@ -119,7 +119,7 @@ export default function App() {
             <FileStack size={20} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-bold tracking-tight">DocForge</p>
+            <p className="font-bold tracking-tight">CALCO</p>
             <p className="text-[10px] uppercase tracking-[.18em] text-muted-foreground">Desktop</p>
           </div>
           <button
@@ -207,7 +207,7 @@ export default function App() {
             </button>
           </div>
         </nav>
-        {appVersion && <p className="shrink-0 border-t px-5 py-2.5 text-[10px] text-muted-foreground">DocForge Desktop v{appVersion}</p>}
+        {appVersion && <p className="shrink-0 border-t px-5 py-2.5 text-[10px] text-muted-foreground">CALCO v{appVersion}</p>}
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">

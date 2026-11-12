@@ -7,7 +7,7 @@ export async function notifyTaskEvent(event: TaskEvent) {
   if (event.type !== "result" && event.type !== "error") return;
   try {
     await invoke("notify_desktop", {
-      title: event.type === "result" ? "DocForge · tarea completada" : "DocForge · tarea fallida",
+      title: event.type === "result" ? "CALCO · tarea completada" : "CALCO · tarea fallida",
       body: event.type === "result" ? "El archivo ya está listo para abrir." : event.message,
     });
   } catch {
